@@ -203,4 +203,11 @@ export class RepCounterHub {
     const c = this.current();
     c.reps = Math.max(0, c.reps + delta);
   }
+
+  snapshot(): RepCounterState {
+    if (this.active === "other") {
+      return { reps: 0, phase: "idle", lastRepAt: null };
+    }
+    return this.current().snapshot();
+  }
 }

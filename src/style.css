@@ -88,6 +88,14 @@ button:disabled {
   color: #86efac;
 }
 
+.inline select {
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+}
+
 .inline input {
   width: 4rem;
   padding: 0.35rem 0.5rem;

@@ -1,3 +1,7 @@
+import {
+  type ExerciseMode,
+  resolveActiveExercise,
+} from "./exerciseSelection";
 import { classifyExercise, ExerciseStabilizer, exerciseLabel } from "./exercises";
 import { extractPoseFeatures } from "./landmarks";
 import {
@@ -27,6 +31,8 @@ const btnRepPlus = document.getElementById("btn-rep-plus") as HTMLButtonElement;
 const btnRepMinus = document.getElementById("btn-rep-minus") as HTMLButtonElement;
 const btnNewSet = document.getElementById("btn-new-set") as HTMLButtonElement;
 const elModelStatus = document.getElementById("model-status")!;
+const selectExerciseMode = document.getElementById("exercise-mode") as HTMLSelectElement;
+const elStatus = document.getElementById("stat-status")!;
 
 const stabilizer = new ExerciseStabilizer();
 const repHub = new RepCounterHub();
@@ -37,6 +43,7 @@ let raf = 0;
 let stream: MediaStream | null = null;
 let fileUrl: string | null = null;
 let lastTimestamp = -1;
+let workExercise: ReturnType<ExerciseStabilizer["getActive"]> = "other";
 
 function resizeCanvas(): void {
   overlay.width = video.clientWidth;
@@ -53,16 +60,30 @@ function renderLog(): void {
   );
 }
 
+function getExerciseMode(): ExerciseMode {
+  const v = selectExerciseMode.value;
+  if (v === "pushup" || v === "squat" || v === "pullup") return v;
+  return "auto";
+}
+
+function activeExerciseForManual(): ReturnType<ExerciseStabilizer["getActive"]> {
+  const mode = getExerciseMode();
+  if (mode !== "auto") return mode;
+  return stabilizer.getActive();
+}
+
 function updateUi(
   exercise: ReturnType<ExerciseStabilizer["update"]>,
   confidence: number,
   reps: number,
   phase: string,
+  statusText: string,
 ): void {
   elExercise.textContent =
     exercise === "other" ? "—" : exerciseLabel(exercise);
   elConfidence.textContent =
     exercise === "other" ? "—" : `${Math.round(confidence * 100)}%`;
+  elStatus.textContent = statusText;
   elReps.textContent = String(reps);
   const snap = setTracker.snapshot();
   elSet.textContent = snap.setNumber > 0 ? String(snap.setNumber) : "0";
@@ -127,14 +148,45 @@ async function loop(): Promise<void> {
     const features = extractPoseFeatures(result.landmarks[0]);
     if (features) {
       const guess = classifyExercise(features);
-      const exercise = stabilizer.update(guess);
-      setTracker.onExerciseChange(exercise);
+      const mode = getExerciseMode();
+      let canCount = true;
+      let statusText = "Counting";
+      if (mode !== "auto") {
+        workExercise = mode;
+        stabilizer.force(mode);
+        statusText = "Manual lock";
+      } else {
+        const stabilized = stabilizer.update(guess);
+        const resolved = resolveActiveExercise("auto", {
+          ...guess,
+          id: stabilized,
+        });
+        if (resolved.counting && resolved.exercise !== "other") {
+          workExercise = resolved.exercise;
+          statusText = "Auto detect";
+        } else {
+          canCount = false;
+          statusText = "Unsure — lock exercise or improve view";
+        }
+      }
 
-      const repState = repHub.update(exercise, features, Date.now());
-      setTracker.syncReps(exercise, repState.reps, Date.now());
-      setTracker.tick(Date.now());
+      let repState = repHub.snapshot();
+      if (canCount && workExercise !== "other") {
+        setTracker.onExerciseChange(workExercise);
+        repState = repHub.update(workExercise, features, Date.now());
+        setTracker.syncReps(workExercise, repState.reps, Date.now());
+      }
+      if (workExercise !== "other") {
+        setTracker.tick(Date.now());
+      }
 
-      updateUi(exercise, guess.confidence, setTracker.snapshot().repsInSet, repState.phase);
+      updateUi(
+        workExercise,
+        guess.confidence,
+        setTracker.snapshot().repsInSet,
+        repState.phase,
+        statusText,
+      );
       renderLog();
     }
   }
@@ -147,6 +199,7 @@ async function startWebcam(): Promise<void> {
   stabilizer.reset();
   repHub.resetAll();
   setTracker.resetSession();
+  workExercise = "other";
   renderLog();
   lastTimestamp = -1;
 
@@ -168,6 +221,7 @@ async function startFile(file: File): Promise<void> {
   stabilizer.reset();
   repHub.resetAll();
   setTracker.resetSession();
+  workExercise = "other";
   renderLog();
   lastTimestamp = -1;
 
@@ -201,35 +255,40 @@ inputRest.addEventListener("change", () => {
   setTracker.setRestSeconds(Number(inputRest.value) || 45);
 });
 
+selectExerciseMode.addEventListener("change", () => {
+  const mode = getExerciseMode();
+  if (mode !== "auto") stabilizer.force(mode);
+});
+
 btnRepPlus.addEventListener("click", () => {
-  const ex = stabilizer.getActive();
+  const ex = activeExerciseForManual();
   if (ex === "other") return;
   repHub.setActive(ex);
   repHub.adjustRep(1);
   setTracker.manualAdjustReps(setTracker.snapshot().repsInSet + 1);
   repHub.current().reps = setTracker.snapshot().repsInSet;
-  updateUi(ex, 1, setTracker.snapshot().repsInSet, repHub.current().phase);
+  updateUi(ex, 1, setTracker.snapshot().repsInSet, repHub.current().phase, "Manual adjust");
 });
 
 btnRepMinus.addEventListener("click", () => {
-  const ex = stabilizer.getActive();
+  const ex = activeExerciseForManual();
   if (ex === "other") return;
   repHub.setActive(ex);
   repHub.adjustRep(-1);
   setTracker.manualAdjustReps(Math.max(0, setTracker.snapshot().repsInSet - 1));
   repHub.current().reps = setTracker.snapshot().repsInSet;
-  updateUi(ex, 1, setTracker.snapshot().repsInSet, repHub.current().phase);
+  updateUi(ex, 1, setTracker.snapshot().repsInSet, repHub.current().phase, "Manual adjust");
 });
 
 btnNewSet.addEventListener("click", () => {
-  const ex = stabilizer.getActive();
+  const ex = activeExerciseForManual();
   setTracker.newSet();
   if (ex !== "other") {
     repHub.setActive(ex);
     repHub.current().reset();
   }
   renderLog();
-  updateUi(ex, 0, 0, "idle");
+  updateUi(ex, 0, 0, "idle", "New set");
 });
 
 window.addEventListener("resize", resizeCanvas);

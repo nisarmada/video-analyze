@@ -1,3 +1,4 @@
+import { resolveActiveExercise } from "../src/exerciseSelection";
 import { classifyExercise } from "../src/exercises";
 import { PullUpCounter, PushUpCounter, SquatCounter } from "../src/repCounter";
 import type { PoseFeatures } from "../src/landmarks";
@@ -70,5 +71,19 @@ const squatGuess = classifyExercise({
   wristAboveShoulder: -0.02,
 });
 assert(squatGuess.id === "squat", `classify squat got ${squatGuess.id}`);
+
+const manual = resolveActiveExercise("pushup", {
+  id: "other",
+  confidence: 0,
+  scores: { pushup: 0, squat: 0, pullup: 0, other: 1 },
+});
+assert(manual.counting && manual.exercise === "pushup", "manual lock should count pushup");
+
+const unsure = resolveActiveExercise("auto", {
+  id: "pushup",
+  confidence: 0.1,
+  scores: { pushup: 0.1, squat: 0, pullup: 0, other: 0.9 },
+});
+assert(!unsure.counting && unsure.exercise === "other", "low confidence should not count");
 
 console.log("smoke tests passed");

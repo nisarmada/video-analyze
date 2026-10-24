@@ -24,6 +24,15 @@
         <span id="model-status" class="model-status">Loading pose model…</span>
         <button type="button" id="btn-stop" disabled>Stop</button>
         <label class="inline">
+          Exercise
+          <select id="exercise-mode">
+            <option value="auto">Auto detect</option>
+            <option value="pushup">Push-up (locked)</option>
+            <option value="squat">Squat (locked)</option>
+            <option value="pullup">Pull-up (locked)</option>
+          </select>
+        </label>
+        <label class="inline">
           Rest between sets (sec)
           <input type="number" id="rest-seconds" min="15" max="180" value="45" />
         </label>
@@ -42,6 +51,10 @@
           <div class="stat">
             <span class="label">Confidence</span>
             <span class="value" id="stat-confidence">—</span>
+          </div>
+          <div class="stat">
+            <span class="label">Status</span>
+            <span class="value" id="stat-status">—</span>
           </div>
           <div class="stat big">
             <span class="label">Reps (this set)</span>
