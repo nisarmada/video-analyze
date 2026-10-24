@@ -1,6 +1,7 @@
 import type { ExerciseId } from "./exercises";
-import { EmaSmoother } from "./math";
 import type { PoseFeatures } from "./landmarks";
+import { EmaSmoother } from "./math";
+import { DEFAULT_ROM, type RomSettings, type RomThresholds } from "./romSettings";
 
 export type RepPhase = "idle" | "eccentric" | "bottom" | "concentric" | "top";
 
@@ -64,14 +65,18 @@ abstract class BaseRepCounter {
 
 /** Elbow angle: extended at top, bent at bottom. */
 export class PushUpCounter extends BaseRepCounter {
-  private readonly topMin = 155;
-  private readonly bottomMax = 105;
+  private thresholds: RomThresholds = DEFAULT_ROM.pushup;
+
+  setThresholds(t: RomThresholds): void {
+    this.thresholds = t;
+  }
 
   update(f: PoseFeatures, nowMs: number): void {
+    const { topMin, bottomMax } = this.thresholds;
     const a = this.smoother.push(f.elbowAngle);
     if (this.fsm === "start") {
-      this.phase = a >= this.topMin ? "top" : "eccentric";
-      if (a <= this.bottomMax) {
+      this.phase = a >= topMin ? "top" : "eccentric";
+      if (a <= bottomMax) {
         if (this.bumpDebounce()) {
           this.fsm = "down";
           this.phase = "bottom";
@@ -79,8 +84,8 @@ export class PushUpCounter extends BaseRepCounter {
         }
       } else this.clearDebounce();
     } else {
-      this.phase = a <= this.bottomMax ? "bottom" : "concentric";
-      if (a >= this.topMin) {
+      this.phase = a <= bottomMax ? "bottom" : "concentric";
+      if (a >= topMin) {
         if (this.bumpDebounce()) {
           this.tryRep(nowMs);
           this.fsm = "start";
@@ -93,14 +98,18 @@ export class PushUpCounter extends BaseRepCounter {
 }
 
 export class PullUpCounter extends BaseRepCounter {
-  private readonly hangMin = 155;
-  private readonly topMax = 105;
+  private thresholds: RomThresholds = DEFAULT_ROM.pullup;
+
+  setThresholds(t: RomThresholds): void {
+    this.thresholds = t;
+  }
 
   update(f: PoseFeatures, nowMs: number): void {
+    const { topMin: hangMin, bottomMax: topMax } = this.thresholds;
     const a = this.smoother.push(f.elbowAngle);
     if (this.fsm === "start") {
-      this.phase = a >= this.hangMin ? "top" : "concentric";
-      if (a <= this.topMax) {
+      this.phase = a >= hangMin ? "top" : "concentric";
+      if (a <= topMax) {
         if (this.bumpDebounce()) {
           this.fsm = "down";
           this.phase = "bottom";
@@ -108,8 +117,8 @@ export class PullUpCounter extends BaseRepCounter {
         }
       } else this.clearDebounce();
     } else {
-      this.phase = a <= this.topMax ? "bottom" : "eccentric";
-      if (a >= this.hangMin) {
+      this.phase = a <= topMax ? "bottom" : "eccentric";
+      if (a >= hangMin) {
         if (this.bumpDebounce()) {
           this.tryRep(nowMs);
           this.fsm = "start";
@@ -122,18 +131,22 @@ export class PullUpCounter extends BaseRepCounter {
 }
 
 export class SquatCounter extends BaseRepCounter {
-  private readonly standMin = 155;
-  private readonly deepMax = 115;
+  private thresholds: RomThresholds = DEFAULT_ROM.squat;
+
+  setThresholds(t: RomThresholds): void {
+    this.thresholds = t;
+  }
 
   update(f: PoseFeatures, nowMs: number): void {
     if (!Number.isFinite(f.kneeAngle)) {
       this.phase = "idle";
       return;
     }
+    const { topMin: standMin, bottomMax: deepMax } = this.thresholds;
     const a = this.smoother.push(f.kneeAngle);
     if (this.fsm === "start") {
-      this.phase = a >= this.standMin ? "top" : "eccentric";
-      if (a <= this.deepMax) {
+      this.phase = a >= standMin ? "top" : "eccentric";
+      if (a <= deepMax) {
         if (this.bumpDebounce()) {
           this.fsm = "down";
           this.phase = "bottom";
@@ -141,8 +154,8 @@ export class SquatCounter extends BaseRepCounter {
         }
       } else this.clearDebounce();
     } else {
-      this.phase = a <= this.deepMax ? "bottom" : "concentric";
-      if (a >= this.standMin) {
+      this.phase = a <= deepMax ? "bottom" : "concentric";
+      if (a >= standMin) {
         if (this.bumpDebounce()) {
           this.tryRep(nowMs);
           this.fsm = "start";
@@ -159,6 +172,12 @@ export class RepCounterHub {
   private pullup = new PullUpCounter();
   private squat = new SquatCounter();
   private active: ExerciseId = "other";
+
+  applyRomSettings(settings: RomSettings): void {
+    this.pushup.setThresholds(settings.pushup);
+    this.pullup.setThresholds(settings.pullup);
+    this.squat.setThresholds(settings.squat);
+  }
 
   setActive(exercise: ExerciseId): void {
     if (exercise === this.active) return;

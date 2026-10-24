@@ -196,6 +196,55 @@ video,
   border-bottom: 1px solid var(--border);
 }
 
+.settings {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.settings h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+.hint {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.rom-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.rom-grid fieldset {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+}
+
+.rom-grid label {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  margin-top: 0.35rem;
+}
+
+.rom-grid input {
+  width: 4rem;
+  padding: 0.25rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
 .tips {
   margin-top: 1.5rem;
   color: var(--muted);

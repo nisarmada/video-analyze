@@ -10,6 +10,12 @@ import {
   initPoseLandmarker,
 } from "./poseDetector";
 import { RepCounterHub } from "./repCounter";
+import {
+  DEFAULT_ROM,
+  loadRomSettings,
+  normalizeRomSettings,
+  saveRomSettings,
+} from "./romSettings";
 import { SetTracker } from "./setTracker";
 
 const video = document.getElementById("video") as HTMLVideoElement;
@@ -37,6 +43,46 @@ const elStatus = document.getElementById("stat-status")!;
 const stabilizer = new ExerciseStabilizer();
 const repHub = new RepCounterHub();
 const setTracker = new SetTracker(Number(inputRest.value) || 45);
+
+const romPushTop = document.getElementById("rom-push-top") as HTMLInputElement;
+const romPushBottom = document.getElementById("rom-push-bottom") as HTMLInputElement;
+const romSquatTop = document.getElementById("rom-squat-top") as HTMLInputElement;
+const romSquatBottom = document.getElementById("rom-squat-bottom") as HTMLInputElement;
+const btnSaveRom = document.getElementById("btn-save-rom") as HTMLButtonElement;
+
+function applyRomFromInputs(): void {
+  const settings = {
+    pushup: {
+      topMin: Number(romPushTop.value) || DEFAULT_ROM.pushup.topMin,
+      bottomMax: Number(romPushBottom.value) || DEFAULT_ROM.pushup.bottomMax,
+    },
+    pullup: {
+      topMin: Number(romPushTop.value) || DEFAULT_ROM.pullup.topMin,
+      bottomMax: Number(romPushBottom.value) || DEFAULT_ROM.pullup.bottomMax,
+    },
+    squat: {
+      topMin: Number(romSquatTop.value) || DEFAULT_ROM.squat.topMin,
+      bottomMax: Number(romSquatBottom.value) || DEFAULT_ROM.squat.bottomMax,
+    },
+    other: DEFAULT_ROM.other,
+  };
+  const normalized = normalizeRomSettings(settings);
+  repHub.applyRomSettings(normalized);
+  saveRomSettings(normalized);
+  loadRomIntoUi();
+}
+
+function loadRomIntoUi(): void {
+  const s = loadRomSettings();
+  romPushTop.value = String(s.pushup.topMin);
+  romPushBottom.value = String(s.pushup.bottomMax);
+  romSquatTop.value = String(s.squat.topMin);
+  romSquatBottom.value = String(s.squat.bottomMax);
+  repHub.applyRomSettings(s);
+}
+
+loadRomIntoUi();
+btnSaveRom.addEventListener("click", applyRomFromInputs);
 
 let detector: Awaited<ReturnType<typeof initPoseLandmarker>> | null = null;
 let raf = 0;

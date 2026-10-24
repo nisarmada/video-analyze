@@ -78,6 +78,24 @@
         </aside>
       </section>
 
+      <section class="settings">
+        <h2>Range of motion (degrees)</h2>
+        <p class="hint">Top = extended; bottom = deepest point that counts as one rep.</p>
+        <div class="rom-grid">
+          <fieldset>
+            <legend>Push-up / pull-up (elbow)</legend>
+            <label>Top min <input type="number" id="rom-push-top" min="120" max="180" value="155" /></label>
+            <label>Bottom max <input type="number" id="rom-push-bottom" min="60" max="140" value="105" /></label>
+          </fieldset>
+          <fieldset>
+            <legend>Squat (knee)</legend>
+            <label>Top min <input type="number" id="rom-squat-top" min="120" max="180" value="155" /></label>
+            <label>Bottom max <input type="number" id="rom-squat-bottom" min="60" max="140" value="115" /></label>
+          </fieldset>
+        </div>
+        <button type="button" id="btn-save-rom">Save ROM settings</button>
+      </section>
+
       <section class="tips">
         <h2>Camera tips</h2>
         <ul>

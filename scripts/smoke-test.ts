@@ -1,4 +1,5 @@
 import { resolveActiveExercise } from "../src/exerciseSelection";
+import { DEFAULT_ROM, normalizeThresholds } from "../src/romSettings";
 import { classifyExercise } from "../src/exercises";
 import { PullUpCounter, PushUpCounter, SquatCounter } from "../src/repCounter";
 import type { PoseFeatures } from "../src/landmarks";
@@ -85,5 +86,9 @@ const unsure = resolveActiveExercise("auto", {
   scores: { pushup: 0.1, squat: 0, pullup: 0, other: 0.9 },
 });
 assert(!unsure.counting && unsure.exercise === "other", "low confidence should not count");
+
+assert(DEFAULT_ROM.squat.bottomMax === 115, "default squat ROM");
+const fixed = normalizeThresholds({ topMin: 100, bottomMax: 130 });
+assert(fixed.topMin > fixed.bottomMax, "normalize inverted ROM");
 
 console.log("smoke tests passed");
