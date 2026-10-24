@@ -2,133 +2,160 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Workout Rep Counter</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>RepTrack — Workout Counter</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/src/style.css" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="theme-color" content="#0f1419" />
+    <meta name="theme-color" content="#09090b" />
   </head>
   <body>
-    <div id="app">
-      <header>
-        <h1>Workout Rep Counter</h1>
-        <p class="subtitle">
-          Pull-ups, push-ups, squats — pose-based reps &amp; sets (on-device)
-        </p>
+    <div id="app" class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <div>
+            <p class="brand-name">RepTrack</p>
+            <p class="brand-tag">On-device rep counter</p>
+          </div>
+        </div>
+        <span id="model-status" class="status-pill">Loading model…</span>
       </header>
 
-      <section class="controls">
-        <label class="file-label">
-          <input type="file" id="video-file" accept="video/*" hidden />
-          Upload video
-        </label>
-        <button type="button" id="btn-webcam" disabled>Use webcam</button>
-        <span id="model-status" class="model-status">Loading pose model…</span>
-        <button type="button" id="btn-start-workout">Start workout</button>
-        <button type="button" id="btn-end-workout" disabled>End workout</button>
-        <button type="button" id="btn-stop" disabled>Stop</button>
-        <label class="inline">
-          Exercise
+      <section class="workout-hero">
+        <div class="video-wrap" id="video-wrap">
+          <video id="video" playsinline muted></video>
+          <canvas id="overlay"></canvas>
+          <div class="video-gradient"></div>
+
+          <div class="hud">
+            <div class="hud-top">
+              <span class="exercise-chip" id="stat-exercise">Ready</span>
+              <span class="phase-chip" id="stat-phase">—</span>
+            </div>
+            <div class="rep-ring" aria-live="polite">
+              <span class="rep-value" id="stat-reps">0</span>
+              <span class="rep-label">REPS</span>
+            </div>
+            <p class="camera-hint" id="camera-hint">Start camera to see framing tips</p>
+          </div>
+
+          <div class="rep-fab-row">
+            <button type="button" class="fab fab-minus" id="btn-rep-minus" aria-label="Remove rep">−</button>
+            <button type="button" class="fab fab-plus" id="btn-rep-plus" aria-label="Add rep">+</button>
+          </div>
+        </div>
+
+        <div class="primary-actions">
+          <button type="button" class="btn btn-primary" id="btn-start-workout">Start workout</button>
+          <button type="button" class="btn btn-danger" id="btn-end-workout" disabled>Finish</button>
+        </div>
+
+        <div class="secondary-actions">
+          <button type="button" class="btn btn-secondary" id="btn-webcam" disabled>Live camera</button>
+          <label class="btn btn-secondary file-label">
+            <input type="file" id="video-file" accept="video/*" hidden />
+            Upload clip
+          </label>
+          <button type="button" class="btn btn-ghost" id="btn-stop" disabled>Stop video</button>
+          <button type="button" class="btn btn-ghost" id="btn-new-set">New set</button>
+        </div>
+      </section>
+
+      <section class="metric-cards">
+        <article class="metric-card">
+          <p class="metric-label">Set</p>
+          <p class="metric-value" id="stat-set">0</p>
+        </article>
+        <article class="metric-card">
+          <p class="metric-label">Confidence</p>
+          <p class="metric-value" id="stat-confidence">—</p>
+        </article>
+        <article class="metric-card metric-card-wide">
+          <p class="metric-label">Status</p>
+          <p class="metric-value metric-value-sm" id="stat-status">Tap Start workout</p>
+        </article>
+      </section>
+
+      <section class="quick-config">
+        <label class="field">
+          <span>Movement</span>
           <select id="exercise-mode">
             <option value="auto">Auto detect</option>
-            <option value="pushup">Push-up (locked)</option>
-            <option value="squat">Squat (locked)</option>
-            <option value="pullup">Pull-up (locked)</option>
+            <option value="pushup">Push-ups</option>
+            <option value="squat">Squats</option>
+            <option value="pullup">Pull-ups</option>
           </select>
         </label>
-        <label class="inline">
-          Rest between sets (sec)
+        <label class="field">
+          <span>Rest timer (sec)</span>
           <input type="number" id="rest-seconds" min="15" max="180" value="45" />
         </label>
       </section>
 
-      <section class="stage">
-        <div class="video-wrap" id="video-wrap">
-          <video id="video" playsinline muted></video>
-          <canvas id="overlay"></canvas>
-          <p class="camera-hint" id="camera-hint">Camera guidance will appear here</p>
+      <details class="panel-drawer" open>
+        <summary>Current session</summary>
+        <ul class="log-list" id="workout-log"></ul>
+      </details>
+
+      <details class="panel-drawer">
+        <summary>History &amp; profile</summary>
+        <p class="hint" id="identity-label">No profile enrolled</p>
+        <div class="inline-actions">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-enroll">Enroll face</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-clear-identity">Clear</button>
         </div>
-        <aside class="panel">
-          <div class="stat">
-            <span class="label">Exercise</span>
-            <span class="value" id="stat-exercise">—</span>
-          </div>
-          <div class="stat">
-            <span class="label">Confidence</span>
-            <span class="value" id="stat-confidence">—</span>
-          </div>
-          <div class="stat">
-            <span class="label">Status</span>
-            <span class="value" id="stat-status">—</span>
-          </div>
-          <div class="stat big">
-            <span class="label">Reps (this set)</span>
-            <span class="value" id="stat-reps">0</span>
-          </div>
-          <div class="stat">
-            <span class="label">Set</span>
-            <span class="value" id="stat-set">0</span>
-          </div>
-          <div class="stat">
-            <span class="label">Phase</span>
-            <span class="value" id="stat-phase">—</span>
-          </div>
-          <div class="buttons">
-            <button type="button" id="btn-rep-minus">− rep</button>
-            <button type="button" id="btn-rep-plus">+ rep</button>
-            <button type="button" id="btn-new-set">New set</button>
-          </div>
-          <h2>Session log</h2>
-          <ul id="workout-log"></ul>
-          <h2>Identity</h2>
-          <p class="hint" id="identity-label">No profile enrolled</p>
-          <button type="button" id="btn-enroll">Enroll me (face in frame)</button>
-          <button type="button" id="btn-clear-identity">Clear profile</button>
-          <h2>Saved workouts</h2>
-          <ul id="history-log"></ul>
-          <button type="button" id="btn-export">Export JSON</button>
-          <button type="button" id="btn-clear-history">Clear history</button>
-        </aside>
-      </section>
+        <ul class="log-list" id="history-log"></ul>
+        <div class="inline-actions">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-export">Export JSON</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-clear-history">Clear history</button>
+        </div>
+      </details>
 
-      <section class="summary hidden" id="workout-summary">
-        <h2>Workout summary</h2>
-        <pre id="summary-body"></pre>
-        <button type="button" id="btn-dismiss-summary">Dismiss</button>
-      </section>
-
-      <section class="settings">
-        <h2>Range of motion (degrees)</h2>
-        <p class="hint">Top = extended; bottom = deepest point that counts as one rep.</p>
+      <details class="panel-drawer">
+        <summary>Range of motion</summary>
+        <p class="hint">Adjust depth so reps match your form.</p>
         <div class="rom-grid">
           <fieldset>
-            <legend>Push-up / pull-up (elbow)</legend>
-            <label>Top min <input type="number" id="rom-push-top" min="120" max="180" value="155" /></label>
-            <label>Bottom max <input type="number" id="rom-push-bottom" min="60" max="140" value="105" /></label>
+            <legend>Push-up / pull-up</legend>
+            <label>Top <input type="number" id="rom-push-top" min="120" max="180" value="155" /></label>
+            <label>Bottom <input type="number" id="rom-push-bottom" min="60" max="140" value="105" /></label>
           </fieldset>
           <fieldset>
-            <legend>Squat (knee)</legend>
-            <label>Top min <input type="number" id="rom-squat-top" min="120" max="180" value="155" /></label>
-            <label>Bottom max <input type="number" id="rom-squat-bottom" min="60" max="140" value="115" /></label>
+            <legend>Squat</legend>
+            <label>Top <input type="number" id="rom-squat-top" min="120" max="180" value="155" /></label>
+            <label>Bottom <input type="number" id="rom-squat-bottom" min="60" max="140" value="115" /></label>
           </fieldset>
         </div>
-        <button type="button" id="btn-save-rom">Save ROM settings</button>
-      </section>
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-save-rom">Save ROM</button>
+      </details>
 
-      <section class="tips">
-        <h2>Privacy</h2>
+      <footer class="app-footer">
         <p>
-          Video is processed on your device. Nothing is uploaded unless you export history yourself.
-          <a href="/privacy.html">Privacy details</a>
+          Video stays on your device.
+          <a href="/privacy.html">Privacy</a>
         </p>
-        <h2>Camera tips</h2>
-        <ul>
-          <li><strong>Push-ups:</strong> side view, full body in frame.</li>
-          <li><strong>Squats:</strong> side or ¾ view, knees visible.</li>
-          <li><strong>Pull-ups:</strong> face camera; arms and torso visible.</li>
+        <ul class="tip-list">
+          <li>Push-ups: side view, full body visible</li>
+          <li>Squats: side or ¾ view, knees in frame</li>
+          <li>Pull-ups: face camera, arms visible</li>
         </ul>
-      </section>
+      </footer>
     </div>
+
+    <div class="modal hidden" id="workout-summary" role="dialog" aria-modal="true">
+      <div class="modal-card">
+        <h2>Workout complete</h2>
+        <pre id="summary-body"></pre>
+        <button type="button" class="btn btn-primary" id="btn-dismiss-summary">Done</button>
+      </div>
+    </div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

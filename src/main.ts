@@ -177,6 +177,10 @@ function activeExerciseForManual(): ReturnType<ExerciseStabilizer["getActive"]> 
   return stabilizer.getActive();
 }
 
+function syncWorkoutChrome(): void {
+  document.body.classList.toggle("workout-live", sessionManager.isActive());
+}
+
 function updateUi(
   exercise: ReturnType<ExerciseStabilizer["update"]>,
   confidence: number,
@@ -185,14 +189,15 @@ function updateUi(
   statusText: string,
 ): void {
   elExercise.textContent =
-    exercise === "other" ? "—" : exerciseLabel(exercise);
+    exercise === "other" ? "Ready" : exerciseLabel(exercise);
   elConfidence.textContent =
     exercise === "other" ? "—" : `${Math.round(confidence * 100)}%`;
   elStatus.textContent = statusText;
   elReps.textContent = String(reps);
   const snap = setTracker.snapshot();
   elSet.textContent = snap.setNumber > 0 ? String(snap.setNumber) : "0";
-  elPhase.textContent = phase;
+  elPhase.textContent = phase === "idle" ? "—" : phase.toUpperCase();
+  syncWorkoutChrome();
 }
 
 async function ensureDetector(): Promise<void> {
@@ -243,7 +248,7 @@ function stopPlayback(): void {
   btnStop.disabled = true;
   if (detector) btnWebcam.disabled = false;
   ctx.clearRect(0, 0, overlay.width, overlay.height);
-  elCameraHint.textContent = "Camera guidance will appear here";
+  elCameraHint.textContent = "Start camera to see framing tips";
 }
 
 async function loop(): Promise<void> {
@@ -320,6 +325,9 @@ async function loop(): Promise<void> {
     const repsInSet = setTracker.snapshot().repsInSet;
     if (repsInSet > lastRepInSet) {
       onRepRegistered(videoWrap);
+      elReps.classList.remove("rep-pop");
+      void elReps.offsetWidth;
+      elReps.classList.add("rep-pop");
       lastRepInSet = repsInSet;
     }
 
@@ -396,6 +404,7 @@ btnStartWorkout.addEventListener("click", () => {
   sessionManager.start();
   btnEndWorkout.disabled = false;
   btnStartWorkout.disabled = true;
+  syncWorkoutChrome();
   elStatus.textContent = "Workout started";
 });
 
@@ -405,6 +414,7 @@ btnEndWorkout.addEventListener("click", () => {
   const finished = sessionManager.end();
   btnEndWorkout.disabled = true;
   btnStartWorkout.disabled = false;
+  syncWorkoutChrome();
   if (finished) {
     saveWorkoutToHistory(finished);
     renderHistory();

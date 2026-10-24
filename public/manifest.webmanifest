@@ -1,11 +1,11 @@
 {
-  "name": "Workout Rep Counter",
-  "short_name": "Rep Counter",
+  "name": "RepTrack",
+  "short_name": "RepTrack",
   "description": "On-device push-up, squat, and pull-up rep counting",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f1419",
-  "theme_color": "#0f1419",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
   "icons": [
     {
       "src": "/icon.svg",
