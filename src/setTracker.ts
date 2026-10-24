@@ -14,9 +14,14 @@ export class SetTracker {
   private lastRepAt: number | null = null;
   private restMs: number;
   private log: SetRecord[] = [];
+  private onSetComplete: ((record: SetRecord) => void) | null = null;
 
   constructor(restSeconds: number) {
     this.restMs = restSeconds * 1000;
+  }
+
+  setOnSetComplete(fn: (record: SetRecord) => void): void {
+    this.onSetComplete = fn;
   }
 
   setRestSeconds(sec: number): void {
@@ -84,6 +89,10 @@ export class SetTracker {
     this.lastRepAt = Date.now();
   }
 
+  finishOpenSet(): void {
+    this.closeSetIfAny();
+  }
+
   newSet(): void {
     this.closeSetIfAny();
     if (this.exercise !== "other") {
@@ -100,12 +109,14 @@ export class SetTracker {
   }
 
   private finishSet(): void {
-    this.log.push({
+    const record: SetRecord = {
       exercise: this.exercise,
       setNumber: this.setNumber,
       reps: this.repsInSet,
       endedAt: new Date(),
-    });
+    };
+    this.log.push(record);
+    this.onSetComplete?.(record);
     this.repsInSet = 0;
     this.lastRepAt = null;
   }
