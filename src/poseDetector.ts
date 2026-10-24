@@ -4,35 +4,49 @@ import {
   type PoseLandmarkerResult,
 } from "@mediapipe/tasks-vision";
 
+const WASM_CDN =
+  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm";
+const MODEL_URL =
+  "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
+
 let landmarker: PoseLandmarker | null = null;
 
-export async function initPoseLandmarker(): Promise<PoseLandmarker> {
+export type PoseLoadProgress = (message: string) => void;
+
+export async function initPoseLandmarker(
+  onProgress?: PoseLoadProgress,
+  maxAttempts = 3,
+): Promise<PoseLandmarker> {
   if (landmarker) return landmarker;
 
-  const vision = await FilesetResolver.forVisionTasks(
-    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm",
-  );
-
-  const baseOptions = {
-    modelAssetPath:
-      "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
-  };
-
-  try {
-    landmarker = await PoseLandmarker.createFromOptions(vision, {
-      baseOptions: { ...baseOptions, delegate: "GPU" },
-      runningMode: "VIDEO",
-      numPoses: 1,
-    });
-  } catch {
-    landmarker = await PoseLandmarker.createFromOptions(vision, {
-      baseOptions: { ...baseOptions, delegate: "CPU" },
-      runningMode: "VIDEO",
-      numPoses: 1,
-    });
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      onProgress?.(`Loading pose model (attempt ${attempt}/${maxAttempts})…`);
+      const vision = await FilesetResolver.forVisionTasks(WASM_CDN);
+      const baseOptions = { modelAssetPath: MODEL_URL };
+      try {
+        landmarker = await PoseLandmarker.createFromOptions(vision, {
+          baseOptions: { ...baseOptions, delegate: "GPU" },
+          runningMode: "VIDEO",
+          numPoses: 3,
+        });
+      } catch {
+        landmarker = await PoseLandmarker.createFromOptions(vision, {
+          baseOptions: { ...baseOptions, delegate: "CPU" },
+          runningMode: "VIDEO",
+          numPoses: 3,
+        });
+      }
+      onProgress?.("Pose model ready");
+      return landmarker;
+    } catch (e) {
+      lastError = e;
+      landmarker = null;
+      await new Promise((r) => setTimeout(r, 800 * attempt));
+    }
   }
-
-  return landmarker;
+  throw lastError;
 }
 
 export function detectForVideo(
@@ -62,21 +76,17 @@ const EDGES: [number, number][] = [
 
 export function drawPose(
   ctx: CanvasRenderingContext2D,
-  result: PoseLandmarkerResult,
+  landmarks: { x: number; y: number }[],
   width: number,
   height: number,
 ): void {
-  const poses = result.landmarks;
-  if (!poses?.length) return;
-  const lm = poses[0];
-
   ctx.strokeStyle = "rgba(56, 189, 248, 0.9)";
   ctx.lineWidth = 3;
   ctx.fillStyle = "rgba(244, 63, 94, 0.95)";
 
   for (const [a, b] of EDGES) {
-    const pa = lm[a];
-    const pb = lm[b];
+    const pa = landmarks[a];
+    const pb = landmarks[b];
     if (!pa || !pb) continue;
     ctx.beginPath();
     ctx.moveTo(pa.x * width, pa.y * height);
@@ -84,7 +94,7 @@ export function drawPose(
     ctx.stroke();
   }
 
-  for (const p of lm) {
+  for (const p of landmarks) {
     ctx.beginPath();
     ctx.arc(p.x * width, p.y * height, 4, 0, Math.PI * 2);
     ctx.fill();
