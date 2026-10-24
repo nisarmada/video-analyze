@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Workout Rep Counter</title>
     <link rel="stylesheet" href="/src/style.css" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0f1419" />
   </head>
   <body>
     <div id="app">
@@ -22,6 +24,8 @@
         </label>
         <button type="button" id="btn-webcam" disabled>Use webcam</button>
         <span id="model-status" class="model-status">Loading pose model…</span>
+        <button type="button" id="btn-start-workout">Start workout</button>
+        <button type="button" id="btn-end-workout" disabled>End workout</button>
         <button type="button" id="btn-stop" disabled>Stop</button>
         <label class="inline">
           Exercise
@@ -39,9 +43,10 @@
       </section>
 
       <section class="stage">
-        <div class="video-wrap">
+        <div class="video-wrap" id="video-wrap">
           <video id="video" playsinline muted></video>
           <canvas id="overlay"></canvas>
+          <p class="camera-hint" id="camera-hint">Camera guidance will appear here</p>
         </div>
         <aside class="panel">
           <div class="stat">
@@ -73,9 +78,23 @@
             <button type="button" id="btn-rep-plus">+ rep</button>
             <button type="button" id="btn-new-set">New set</button>
           </div>
-          <h2>Log</h2>
+          <h2>Session log</h2>
           <ul id="workout-log"></ul>
+          <h2>Identity</h2>
+          <p class="hint" id="identity-label">No profile enrolled</p>
+          <button type="button" id="btn-enroll">Enroll me (face in frame)</button>
+          <button type="button" id="btn-clear-identity">Clear profile</button>
+          <h2>Saved workouts</h2>
+          <ul id="history-log"></ul>
+          <button type="button" id="btn-export">Export JSON</button>
+          <button type="button" id="btn-clear-history">Clear history</button>
         </aside>
+      </section>
+
+      <section class="summary hidden" id="workout-summary">
+        <h2>Workout summary</h2>
+        <pre id="summary-body"></pre>
+        <button type="button" id="btn-dismiss-summary">Dismiss</button>
       </section>
 
       <section class="settings">
@@ -97,6 +116,11 @@
       </section>
 
       <section class="tips">
+        <h2>Privacy</h2>
+        <p>
+          Video is processed on your device. Nothing is uploaded unless you export history yourself.
+          <a href="/privacy.html">Privacy details</a>
+        </p>
         <h2>Camera tips</h2>
         <ul>
           <li><strong>Push-ups:</strong> side view, full body in frame.</li>
