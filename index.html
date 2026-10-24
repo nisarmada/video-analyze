@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Workout Rep Counter</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1>Workout Rep Counter</h1>
+        <p class="subtitle">
+          Pull-ups, push-ups, squats — pose-based reps &amp; sets (on-device)
+        </p>
+      </header>
+
+      <section class="controls">
+        <label class="file-label">
+          <input type="file" id="video-file" accept="video/*" hidden />
+          Upload video
+        </label>
+        <button type="button" id="btn-webcam" disabled>Use webcam</button>
+        <span id="model-status" class="model-status">Loading pose model…</span>
+        <button type="button" id="btn-stop" disabled>Stop</button>
+        <label class="inline">
+          Rest between sets (sec)
+          <input type="number" id="rest-seconds" min="15" max="180" value="45" />
+        </label>
+      </section>
+
+      <section class="stage">
+        <div class="video-wrap">
+          <video id="video" playsinline muted></video>
+          <canvas id="overlay"></canvas>
+        </div>
+        <aside class="panel">
+          <div class="stat">
+            <span class="label">Exercise</span>
+            <span class="value" id="stat-exercise">—</span>
+          </div>
+          <div class="stat">
+            <span class="label">Confidence</span>
+            <span class="value" id="stat-confidence">—</span>
+          </div>
+          <div class="stat big">
+            <span class="label">Reps (this set)</span>
+            <span class="value" id="stat-reps">0</span>
+          </div>
+          <div class="stat">
+            <span class="label">Set</span>
+            <span class="value" id="stat-set">0</span>
+          </div>
+          <div class="stat">
+            <span class="label">Phase</span>
+            <span class="value" id="stat-phase">—</span>
+          </div>
+          <div class="buttons">
+            <button type="button" id="btn-rep-minus">− rep</button>
+            <button type="button" id="btn-rep-plus">+ rep</button>
+            <button type="button" id="btn-new-set">New set</button>
+          </div>
+          <h2>Log</h2>
+          <ul id="workout-log"></ul>
+        </aside>
+      </section>
+
+      <section class="tips">
+        <h2>Camera tips</h2>
+        <ul>
+          <li><strong>Push-ups:</strong> side view, full body in frame.</li>
+          <li><strong>Squats:</strong> side or ¾ view, knees visible.</li>
+          <li><strong>Pull-ups:</strong> face camera; arms and torso visible.</li>
+        </ul>
+      </section>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

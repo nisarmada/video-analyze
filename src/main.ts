@@ -1,0 +1,241 @@
+import { classifyExercise, ExerciseStabilizer, exerciseLabel } from "./exercises";
+import { extractPoseFeatures } from "./landmarks";
+import {
+  detectForVideo,
+  drawPose,
+  initPoseLandmarker,
+} from "./poseDetector";
+import { RepCounterHub } from "./repCounter";
+import { SetTracker } from "./setTracker";
+
+const video = document.getElementById("video") as HTMLVideoElement;
+const overlay = document.getElementById("overlay") as HTMLCanvasElement;
+const ctx = overlay.getContext("2d")!;
+
+const elExercise = document.getElementById("stat-exercise")!;
+const elConfidence = document.getElementById("stat-confidence")!;
+const elReps = document.getElementById("stat-reps")!;
+const elSet = document.getElementById("stat-set")!;
+const elPhase = document.getElementById("stat-phase")!;
+const elLog = document.getElementById("workout-log")!;
+
+const btnWebcam = document.getElementById("btn-webcam") as HTMLButtonElement;
+const btnStop = document.getElementById("btn-stop") as HTMLButtonElement;
+const inputFile = document.getElementById("video-file") as HTMLInputElement;
+const inputRest = document.getElementById("rest-seconds") as HTMLInputElement;
+const btnRepPlus = document.getElementById("btn-rep-plus") as HTMLButtonElement;
+const btnRepMinus = document.getElementById("btn-rep-minus") as HTMLButtonElement;
+const btnNewSet = document.getElementById("btn-new-set") as HTMLButtonElement;
+const elModelStatus = document.getElementById("model-status")!;
+
+const stabilizer = new ExerciseStabilizer();
+const repHub = new RepCounterHub();
+const setTracker = new SetTracker(Number(inputRest.value) || 45);
+
+let detector: Awaited<ReturnType<typeof initPoseLandmarker>> | null = null;
+let raf = 0;
+let stream: MediaStream | null = null;
+let fileUrl: string | null = null;
+let lastTimestamp = -1;
+
+function resizeCanvas(): void {
+  overlay.width = video.clientWidth;
+  overlay.height = video.clientHeight;
+}
+
+function renderLog(): void {
+  elLog.replaceChildren(
+    ...setTracker.getLog().map((r) => {
+      const li = document.createElement("li");
+      li.textContent = setTracker.formatLogEntry(r);
+      return li;
+    }),
+  );
+}
+
+function updateUi(
+  exercise: ReturnType<ExerciseStabilizer["update"]>,
+  confidence: number,
+  reps: number,
+  phase: string,
+): void {
+  elExercise.textContent =
+    exercise === "other" ? "—" : exerciseLabel(exercise);
+  elConfidence.textContent =
+    exercise === "other" ? "—" : `${Math.round(confidence * 100)}%`;
+  elReps.textContent = String(reps);
+  const snap = setTracker.snapshot();
+  elSet.textContent = snap.setNumber > 0 ? String(snap.setNumber) : "0";
+  elPhase.textContent = phase;
+}
+
+async function ensureDetector(): Promise<void> {
+  if (!detector) {
+    detector = await initPoseLandmarker();
+    elModelStatus.textContent = "Pose model ready";
+    elModelStatus.classList.add("ready");
+    btnWebcam.disabled = false;
+  }
+}
+
+function stopPlayback(): void {
+  cancelAnimationFrame(raf);
+  raf = 0;
+  video.pause();
+  if (stream) {
+    stream.getTracks().forEach((t) => t.stop());
+    stream = null;
+  }
+  if (fileUrl) {
+    URL.revokeObjectURL(fileUrl);
+    fileUrl = null;
+  }
+  video.srcObject = null;
+  btnStop.disabled = true;
+  btnWebcam.disabled = false;
+  ctx.clearRect(0, 0, overlay.width, overlay.height);
+}
+
+async function loop(): Promise<void> {
+  if (!detector) return;
+
+  const nowMs = performance.now();
+  if (video.paused || video.ended) {
+    if (video.ended && !stream) {
+      stopPlayback();
+      return;
+    }
+  }
+
+  resizeCanvas();
+
+  let timestampMs = Math.floor(video.currentTime * 1000);
+  if (stream) {
+    timestampMs = Math.floor(nowMs);
+  }
+  if (timestampMs === lastTimestamp) {
+    raf = requestAnimationFrame(loop);
+    return;
+  }
+  lastTimestamp = timestampMs;
+
+  const result = detectForVideo(detector, video, timestampMs);
+  ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+  if (result?.landmarks?.[0]) {
+    drawPose(ctx, result, overlay.width, overlay.height);
+    const features = extractPoseFeatures(result.landmarks[0]);
+    if (features) {
+      const guess = classifyExercise(features);
+      const exercise = stabilizer.update(guess);
+      setTracker.onExerciseChange(exercise);
+
+      const repState = repHub.update(exercise, features, Date.now());
+      setTracker.syncReps(exercise, repState.reps, Date.now());
+      setTracker.tick(Date.now());
+
+      updateUi(exercise, guess.confidence, setTracker.snapshot().repsInSet, repState.phase);
+      renderLog();
+    }
+  }
+
+  raf = requestAnimationFrame(loop);
+}
+
+async function startWebcam(): Promise<void> {
+  stopPlayback();
+  stabilizer.reset();
+  repHub.resetAll();
+  setTracker.resetSession();
+  renderLog();
+  lastTimestamp = -1;
+
+  await ensureDetector();
+  stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+    audio: false,
+  });
+  video.srcObject = stream;
+  video.muted = true;
+  await video.play();
+  btnStop.disabled = false;
+  btnWebcam.disabled = true;
+  raf = requestAnimationFrame(loop);
+}
+
+async function startFile(file: File): Promise<void> {
+  stopPlayback();
+  stabilizer.reset();
+  repHub.resetAll();
+  setTracker.resetSession();
+  renderLog();
+  lastTimestamp = -1;
+
+  await ensureDetector();
+  fileUrl = URL.createObjectURL(file);
+  video.srcObject = null;
+  video.src = fileUrl;
+  video.loop = true;
+  video.muted = true;
+  await video.play();
+  btnStop.disabled = false;
+  raf = requestAnimationFrame(loop);
+}
+
+btnWebcam.addEventListener("click", () => {
+  startWebcam().catch((e) => {
+    console.error(e);
+    alert("Could not open webcam. Check permissions and use HTTPS or localhost.");
+  });
+});
+
+btnStop.addEventListener("click", stopPlayback);
+
+inputFile.addEventListener("change", () => {
+  const file = inputFile.files?.[0];
+  if (file) startFile(file).catch(console.error);
+  inputFile.value = "";
+});
+
+inputRest.addEventListener("change", () => {
+  setTracker.setRestSeconds(Number(inputRest.value) || 45);
+});
+
+btnRepPlus.addEventListener("click", () => {
+  const ex = stabilizer.getActive();
+  if (ex === "other") return;
+  repHub.setActive(ex);
+  repHub.adjustRep(1);
+  setTracker.manualAdjustReps(setTracker.snapshot().repsInSet + 1);
+  repHub.current().reps = setTracker.snapshot().repsInSet;
+  updateUi(ex, 1, setTracker.snapshot().repsInSet, repHub.current().phase);
+});
+
+btnRepMinus.addEventListener("click", () => {
+  const ex = stabilizer.getActive();
+  if (ex === "other") return;
+  repHub.setActive(ex);
+  repHub.adjustRep(-1);
+  setTracker.manualAdjustReps(Math.max(0, setTracker.snapshot().repsInSet - 1));
+  repHub.current().reps = setTracker.snapshot().repsInSet;
+  updateUi(ex, 1, setTracker.snapshot().repsInSet, repHub.current().phase);
+});
+
+btnNewSet.addEventListener("click", () => {
+  const ex = stabilizer.getActive();
+  setTracker.newSet();
+  if (ex !== "other") {
+    repHub.setActive(ex);
+    repHub.current().reset();
+  }
+  renderLog();
+  updateUi(ex, 0, 0, "idle");
+});
+
+window.addEventListener("resize", resizeCanvas);
+
+ensureDetector().catch((e) => {
+  console.error("Pose model failed to load:", e);
+  elModelStatus.textContent = "Pose model failed to load";
+  alert("Failed to load pose model. Check your network connection.");
+});
