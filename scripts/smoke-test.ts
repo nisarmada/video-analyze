@@ -1,4 +1,6 @@
 import { resolveActiveExercise } from "../src/exerciseSelection";
+import { cameraGuidance } from "../src/cameraGuidance";
+import { buildSignature, signatureDistance } from "../src/identity";
 import { DEFAULT_ROM, normalizeThresholds } from "../src/romSettings";
 import { classifyExercise } from "../src/exercises";
 import { PullUpCounter, PushUpCounter, SquatCounter } from "../src/repCounter";
@@ -90,5 +92,19 @@ assert(!unsure.counting && unsure.exercise === "other", "low confidence should n
 assert(DEFAULT_ROM.squat.bottomMax === 115, "default squat ROM");
 const fixed = normalizeThresholds({ topMin: 100, bottomMax: 130 });
 assert(fixed.topMin > fixed.bottomMax, "normalize inverted ROM");
+
+assert(
+  cameraGuidance(undefined).includes("No person"),
+  "camera guidance empty frame",
+);
+
+const fakeLm = Array.from({ length: 33 }, (_, i) => ({
+  x: 0.5 + (i % 5) * 0.01,
+  y: 0.4 + (i % 7) * 0.01,
+  visibility: 1,
+}));
+const sig = buildSignature(fakeLm);
+assert(sig !== null && sig.length > 0, "signature");
+assert(signatureDistance(sig!, sig!) === 0, "signature distance self");
 
 console.log("smoke tests passed");

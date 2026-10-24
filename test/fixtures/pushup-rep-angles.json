@@ -1,0 +1,6 @@
+{
+  "exercise": "pushup",
+  "angles": [170, 90, 90, 170, 170],
+  "key": "elbowAngle",
+  "expectedReps": 1
+}
