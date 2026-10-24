@@ -1,0 +1,117 @@
+import { exerciseLabel, type ExerciseId } from "./exercises";
+
+export type SetRecord = {
+  exercise: ExerciseId;
+  setNumber: number;
+  reps: number;
+  endedAt: Date;
+};
+
+export class SetTracker {
+  private exercise: ExerciseId = "other";
+  private setNumber = 0;
+  private repsInSet = 0;
+  private lastRepAt: number | null = null;
+  private restMs: number;
+  private log: SetRecord[] = [];
+
+  constructor(restSeconds: number) {
+    this.restMs = restSeconds * 1000;
+  }
+
+  setRestSeconds(sec: number): void {
+    this.restMs = sec * 1000;
+  }
+
+  resetSession(): void {
+    this.exercise = "other";
+    this.setNumber = 0;
+    this.repsInSet = 0;
+    this.lastRepAt = null;
+    this.log = [];
+  }
+
+  getLog(): readonly SetRecord[] {
+    return this.log;
+  }
+
+  snapshot() {
+    return {
+      exercise: this.exercise,
+      setNumber: this.setNumber,
+      repsInSet: this.repsInSet,
+    };
+  }
+
+  onExerciseChange(next: ExerciseId): void {
+    if (next === this.exercise) return;
+    this.closeSetIfAny();
+    this.exercise = next;
+    if (next !== "other") {
+      this.setNumber++;
+      this.repsInSet = 0;
+      this.lastRepAt = null;
+    }
+  }
+
+  syncReps(exercise: ExerciseId, reps: number, nowMs: number): void {
+    if (exercise === "other") return;
+    if (exercise !== this.exercise) this.onExerciseChange(exercise);
+    if (this.setNumber === 0) {
+      this.setNumber = 1;
+      this.exercise = exercise;
+    }
+
+    if (reps > this.repsInSet) {
+      this.repsInSet = reps;
+      this.lastRepAt = nowMs;
+    } else if (reps < this.repsInSet) {
+      this.repsInSet = reps;
+    }
+  }
+
+  tick(nowMs: number): void {
+    if (this.exercise === "other" || this.repsInSet === 0 || this.lastRepAt === null) {
+      return;
+    }
+    if (nowMs - this.lastRepAt >= this.restMs) {
+      this.finishSet();
+    }
+  }
+
+  manualAdjustReps(reps: number): void {
+    this.repsInSet = Math.max(0, reps);
+    this.lastRepAt = Date.now();
+  }
+
+  newSet(): void {
+    this.closeSetIfAny();
+    if (this.exercise !== "other") {
+      this.setNumber++;
+      this.repsInSet = 0;
+      this.lastRepAt = null;
+    }
+  }
+
+  private closeSetIfAny(): void {
+    if (this.exercise !== "other" && this.repsInSet > 0) {
+      this.finishSet();
+    }
+  }
+
+  private finishSet(): void {
+    this.log.push({
+      exercise: this.exercise,
+      setNumber: this.setNumber,
+      reps: this.repsInSet,
+      endedAt: new Date(),
+    });
+    this.repsInSet = 0;
+    this.lastRepAt = null;
+  }
+
+  formatLogEntry(r: SetRecord): string {
+    const t = r.endedAt.toLocaleTimeString();
+    return `${t} — ${exerciseLabel(r.exercise)} set ${r.setNumber}: ${r.reps} reps`;
+  }
+}
