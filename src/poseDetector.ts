@@ -3,11 +3,10 @@ import {
   PoseLandmarker,
   type PoseLandmarkerResult,
 } from "@mediapipe/tasks-vision";
+import { mapLandmarkToCanvas, type ContentRect } from "./videoLayout";
 
-const WASM_CDN =
-  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm";
-const MODEL_URL =
-  "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
+const WASM_PATH = "/mediapipe/wasm";
+const MODEL_URL = "/models/pose_landmarker_lite.task";
 
 let landmarker: PoseLandmarker | null = null;
 
@@ -23,7 +22,7 @@ export async function initPoseLandmarker(
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       onProgress?.(`Loading pose model (attempt ${attempt}/${maxAttempts})…`);
-      const vision = await FilesetResolver.forVisionTasks(WASM_CDN);
+      const vision = await FilesetResolver.forVisionTasks(WASM_PATH);
       const baseOptions = { modelAssetPath: MODEL_URL };
       try {
         landmarker = await PoseLandmarker.createFromOptions(vision, {
@@ -79,7 +78,9 @@ export function drawPose(
   landmarks: { x: number; y: number }[],
   width: number,
   height: number,
+  content?: ContentRect,
 ): void {
+  const rect = content ?? { x: 0, y: 0, width, height };
   ctx.strokeStyle = "rgba(56, 189, 248, 0.9)";
   ctx.lineWidth = 3;
   ctx.fillStyle = "rgba(244, 63, 94, 0.95)";
@@ -88,15 +89,18 @@ export function drawPose(
     const pa = landmarks[a];
     const pb = landmarks[b];
     if (!pa || !pb) continue;
+    const start = mapLandmarkToCanvas(pa, rect);
+    const end = mapLandmarkToCanvas(pb, rect);
     ctx.beginPath();
-    ctx.moveTo(pa.x * width, pa.y * height);
-    ctx.lineTo(pb.x * width, pb.y * height);
+    ctx.moveTo(start.x, start.y);
+    ctx.lineTo(end.x, end.y);
     ctx.stroke();
   }
 
   for (const p of landmarks) {
+    const dot = mapLandmarkToCanvas(p, rect);
     ctx.beginPath();
-    ctx.arc(p.x * width, p.y * height, 4, 0, Math.PI * 2);
+    ctx.arc(dot.x, dot.y, 4, 0, Math.PI * 2);
     ctx.fill();
   }
 }

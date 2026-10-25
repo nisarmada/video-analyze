@@ -1,4 +1,9 @@
+import "@fontsource/inter/latin-400.css";
+import "@fontsource/inter/latin-600.css";
+import "@fontsource/inter/latin-700.css";
+import "@fontsource/inter/latin-800.css";
 import { cameraGuidance } from "./cameraGuidance";
+import { nextDetectionTimestamp } from "./detectionClock";
 import {
   type ExerciseMode,
   resolveActiveExercise,
@@ -27,12 +32,14 @@ import {
 } from "./romSettings";
 import { SessionManager } from "./sessionManager";
 import { SetTracker } from "./setTracker";
+import { objectFitContainRect } from "./videoLayout";
 import {
   clearWorkoutHistory,
   exportHistoryJson,
   loadWorkoutHistory,
   saveWorkoutToHistory,
 } from "./workoutStorage";
+import { formatWorkoutSummary, historyToCsv } from "./workoutSummary";
 
 const video = document.getElementById("video") as HTMLVideoElement;
 const overlay = document.getElementById("overlay") as HTMLCanvasElement;
@@ -64,6 +71,7 @@ const elStatus = document.getElementById("stat-status")!;
 const btnEnroll = document.getElementById("btn-enroll") as HTMLButtonElement;
 const btnClearIdentity = document.getElementById("btn-clear-identity") as HTMLButtonElement;
 const btnExport = document.getElementById("btn-export") as HTMLButtonElement;
+const btnExportCsv = document.getElementById("btn-export-csv") as HTMLButtonElement;
 const btnClearHistory = document.getElementById("btn-clear-history") as HTMLButtonElement;
 const summarySection = document.getElementById("workout-summary")!;
 const summaryBody = document.getElementById("summary-body")!;
@@ -88,6 +96,7 @@ let lastTimestamp = -1;
 let workExercise: ReturnType<ExerciseStabilizer["getActive"]> = "other";
 let lastRepInSet = 0;
 let latestLandmarks: Landmark[] | null = null;
+let renderedLogKey = "";
 
 function applyRomFromInputs(): void {
   const settings = {
@@ -125,13 +134,14 @@ btnSaveRom.addEventListener("click", applyRomFromInputs);
 
 setTracker.setOnSetComplete((record) => {
   sessionManager.ingestSet(record);
+  repHub.current().reset();
 });
 
 function renderIdentityLabel(): void {
   const profile = loadIdentity();
   elIdentity.textContent = profile
-    ? `Enrolled: ${profile.name}`
-    : "No profile enrolled (tracks largest person)";
+    ? `Tracking: ${profile.name}`
+    : "No person selected (tracks the largest person)";
 }
 
 function renderHistory(): void {
@@ -141,7 +151,9 @@ function renderHistory(): void {
       const date = new Date(s.startedAt).toLocaleString();
       const sets = s.sets.length;
       const reps = s.sets.reduce((n, set) => n + set.reps, 0);
-      li.textContent = `${date} — ${sets} sets, ${reps} reps`;
+      const setLabel = sets === 1 ? "set" : "sets";
+      const repLabel = reps === 1 ? "rep" : "reps";
+      li.textContent = `${date} — ${sets} ${setLabel}, ${reps} ${repLabel}`;
       return li;
     }),
   );
@@ -156,13 +168,41 @@ function resizeCanvas(): void {
 }
 
 function renderLog(): void {
+  const entries = setTracker.getLog();
+  const key = entries
+    .map((r) => `${r.endedAt}|${r.exercise}|${r.setNumber}|${r.reps}`)
+    .join(";");
+  if (key === renderedLogKey) return;
+  renderedLogKey = key;
   elLog.replaceChildren(
-    ...setTracker.getLog().map((r) => {
+    ...entries.map((r) => {
       const li = document.createElement("li");
       li.textContent = setTracker.formatLogEntry(r);
       return li;
     }),
   );
+}
+
+function noteRest(): void {
+  if (workExercise === "other") return;
+  if (!setTracker.tick(Date.now())) return;
+  const snap = setTracker.snapshot();
+  elReps.textContent = String(snap.repsInSet);
+  elSet.textContent = snap.setNumber > 0 ? String(snap.setNumber) : "0";
+  elPhase.textContent = "—";
+  elStatus.textContent = "Set saved";
+  lastRepInSet = 0;
+  renderLog();
+}
+
+function downloadText(filename: string, contents: string, type: string): void {
+  const blob = new Blob([contents], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function getExerciseMode(): ExerciseMode {
@@ -255,18 +295,19 @@ async function loop(): Promise<void> {
   if (!detector) return;
 
   const nowMs = performance.now();
-  if (video.paused || video.ended) {
-    if (video.ended && !stream) {
-      stopPlayback();
-      return;
-    }
+  if (video.ended && !stream) {
+    stopPlayback();
+    return;
   }
 
   resizeCanvas();
 
-  let timestampMs = Math.floor(video.currentTime * 1000);
-  if (stream) timestampMs = Math.floor(nowMs);
-  if (timestampMs === lastTimestamp) {
+  const timestampMs = nextDetectionTimestamp(lastTimestamp, {
+    currentTimeSec: video.currentTime,
+    ...(stream ? { liveMs: nowMs } : {}),
+  });
+  if (timestampMs === null) {
+    noteRest();
     raf = requestAnimationFrame(loop);
     return;
   }
@@ -277,6 +318,7 @@ async function loop(): Promise<void> {
 
   if (!result?.landmarks?.length) {
     elCameraHint.textContent = cameraGuidance(undefined);
+    noteRest();
     raf = requestAnimationFrame(loop);
     return;
   }
@@ -285,7 +327,13 @@ async function loop(): Promise<void> {
   const landmarks = result.landmarks[poseIndex];
   latestLandmarks = landmarks;
   elCameraHint.textContent = cameraGuidance(landmarks);
-  drawPose(ctx, landmarks, overlay.width, overlay.height);
+  const content = objectFitContainRect(
+    overlay.width,
+    overlay.height,
+    video.videoWidth,
+    video.videoHeight,
+  );
+  drawPose(ctx, landmarks, overlay.width, overlay.height, content);
 
   const features = extractPoseFeatures(landmarks);
   if (features) {
@@ -318,10 +366,6 @@ async function loop(): Promise<void> {
       repState = repHub.update(workExercise, features, Date.now());
       setTracker.syncReps(workExercise, repState.reps, Date.now());
     }
-    if (workExercise !== "other") {
-      setTracker.tick(Date.now());
-    }
-
     const repsInSet = setTracker.snapshot().repsInSet;
     if (repsInSet > lastRepInSet) {
       onRepRegistered(videoWrap);
@@ -341,6 +385,7 @@ async function loop(): Promise<void> {
     renderLog();
   }
 
+  noteRest();
   raf = requestAnimationFrame(loop);
 }
 
@@ -367,7 +412,7 @@ async function startFile(file: File): Promise<void> {
   fileUrl = URL.createObjectURL(file);
   video.srcObject = null;
   video.src = fileUrl;
-  video.loop = true;
+  video.loop = false;
   video.muted = true;
   await video.play();
   btnStop.disabled = false;
@@ -414,11 +459,15 @@ btnEndWorkout.addEventListener("click", () => {
   const finished = sessionManager.end();
   btnEndWorkout.disabled = true;
   btnStartWorkout.disabled = false;
+  lastRepInSet = 0;
+  elReps.textContent = "0";
+  elStatus.textContent = finished ? "Workout saved" : "Workout ended";
+  renderLog();
   syncWorkoutChrome();
   if (finished) {
     saveWorkoutToHistory(finished);
     renderHistory();
-    summaryBody.textContent = JSON.stringify(finished, null, 2);
+    summaryBody.textContent = formatWorkoutSummary(finished);
     summarySection.classList.remove("hidden");
   }
 });
@@ -429,15 +478,15 @@ btnDismissSummary.addEventListener("click", () => {
 
 btnEnroll.addEventListener("click", () => {
   if (!latestLandmarks) {
-    alert("Start camera and stand in frame before enrolling.");
+    alert("Start the camera and stand in frame first.");
     return;
   }
   const signature = buildSignature(latestLandmarks);
   if (!signature) {
-    alert("Face not visible — face the camera and try again.");
+    alert("Upper body is not clear enough. Face the camera and try again.");
     return;
   }
-  const name = prompt("Your name for this profile:", "Me") || "Me";
+  const name = prompt("Name for the person in frame:", "Me") || "Me";
   saveIdentity({ name, signature });
   renderIdentityLabel();
 });
@@ -448,13 +497,11 @@ btnClearIdentity.addEventListener("click", () => {
 });
 
 btnExport.addEventListener("click", () => {
-  const blob = new Blob([exportHistoryJson()], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "workout-history.json";
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadText("workout-history.json", exportHistoryJson(), "application/json");
+});
+
+btnExportCsv.addEventListener("click", () => {
+  downloadText("workout-history.csv", historyToCsv(loadWorkoutHistory()), "text/csv");
 });
 
 btnClearHistory.addEventListener("click", () => {
@@ -464,27 +511,19 @@ btnClearHistory.addEventListener("click", () => {
   }
 });
 
-btnRepPlus.addEventListener("click", () => {
+function adjustReps(delta: number): void {
   const ex = activeExerciseForManual();
   if (ex === "other") return;
   repHub.setActive(ex);
   setTracker.onExerciseChange(ex);
-  repHub.adjustRep(1);
-  setTracker.manualAdjustReps(setTracker.snapshot().repsInSet + 1);
-  repHub.current().reps = setTracker.snapshot().repsInSet;
-  updateUi(ex, 1, setTracker.snapshot().repsInSet, repHub.current().phase, "Manual adjust");
-});
+  const next = Math.max(0, setTracker.snapshot().repsInSet + delta);
+  setTracker.manualAdjustReps(next);
+  repHub.current().reps = next;
+  updateUi(ex, 1, next, repHub.current().phase, "Manual adjust");
+}
 
-btnRepMinus.addEventListener("click", () => {
-  const ex = activeExerciseForManual();
-  if (ex === "other") return;
-  repHub.setActive(ex);
-  setTracker.onExerciseChange(ex);
-  repHub.adjustRep(-1);
-  setTracker.manualAdjustReps(Math.max(0, setTracker.snapshot().repsInSet - 1));
-  repHub.current().reps = setTracker.snapshot().repsInSet;
-  updateUi(ex, 1, setTracker.snapshot().repsInSet, repHub.current().phase, "Manual adjust");
-});
+btnRepPlus.addEventListener("click", () => adjustReps(1));
+btnRepMinus.addEventListener("click", () => adjustReps(-1));
 
 btnNewSet.addEventListener("click", () => {
   const ex = activeExerciseForManual();

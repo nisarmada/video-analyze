@@ -4,12 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>RepTrack — Workout Counter</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
     <link rel="stylesheet" href="/src/style.css" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#09090b" />
@@ -105,14 +99,19 @@
 
       <details class="panel-drawer">
         <summary>History &amp; profile</summary>
-        <p class="hint" id="identity-label">No profile enrolled</p>
+        <p class="hint" id="identity-label">No person selected</p>
+        <p class="hint">
+          Select person remembers a body outline and prefers that person when several are in frame.
+          It does not recognize a face.
+        </p>
         <div class="inline-actions">
-          <button type="button" class="btn btn-secondary btn-sm" id="btn-enroll">Enroll face</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-enroll">Select person</button>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-clear-identity">Clear</button>
         </div>
         <ul class="log-list" id="history-log"></ul>
         <div class="inline-actions">
           <button type="button" class="btn btn-secondary btn-sm" id="btn-export">Export JSON</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-export-csv">Export CSV</button>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-clear-history">Clear history</button>
         </div>
       </details>
@@ -139,6 +138,8 @@
         <p>
           Video stays on your device.
           <a href="/privacy.html">Privacy</a>
+          ·
+          <a href="/limitations.html">Limitations</a>
         </p>
         <ul class="tip-list">
           <li>Push-ups: side view, full body visible</li>

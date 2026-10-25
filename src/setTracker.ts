@@ -4,7 +4,8 @@ export type SetRecord = {
   exercise: ExerciseId;
   setNumber: number;
   reps: number;
-  endedAt: Date;
+  /** ISO-8601. JSON storage cannot keep a Date instance. */
+  endedAt: string;
 };
 
 export class SetTracker {
@@ -75,13 +76,15 @@ export class SetTracker {
     }
   }
 
-  tick(nowMs: number): void {
+  /** Closes the open set once rest has elapsed. Returns true when a set was closed. */
+  tick(nowMs: number): boolean {
     if (this.exercise === "other" || this.repsInSet === 0 || this.lastRepAt === null) {
-      return;
+      return false;
     }
-    if (nowMs - this.lastRepAt >= this.restMs) {
-      this.finishSet();
-    }
+    if (nowMs - this.lastRepAt < this.restMs) return false;
+    this.finishSet();
+    this.setNumber++;
+    return true;
   }
 
   manualAdjustReps(reps: number): void {
@@ -113,7 +116,7 @@ export class SetTracker {
       exercise: this.exercise,
       setNumber: this.setNumber,
       reps: this.repsInSet,
-      endedAt: new Date(),
+      endedAt: new Date().toISOString(),
     };
     this.log.push(record);
     this.onSetComplete?.(record);
@@ -122,7 +125,7 @@ export class SetTracker {
   }
 
   formatLogEntry(r: SetRecord): string {
-    const t = r.endedAt.toLocaleTimeString();
+    const t = new Date(r.endedAt).toLocaleTimeString();
     return `${t} — ${exerciseLabel(r.exercise)} set ${r.setNumber}: ${r.reps} reps`;
   }
 }

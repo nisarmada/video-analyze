@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Limitations — RepTrack</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 640px;
+        margin: 2rem auto;
+        padding: 0 1rem 3rem;
+        line-height: 1.6;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Limitations</h1>
+    <p>
+      RepTrack counts push-ups, squats, and pull-ups from a camera or a video file. It is a
+      workout aid. It is not a validated fitness test, and it is not medical or coaching advice.
+    </p>
+
+    <h2>What stays on this device</h2>
+    <ul>
+      <li>Camera frames and uploaded clips are processed in the browser. They are not uploaded.</li>
+      <li>
+        The pose model and its runtime are part of this app. Counting does not call a vision API.
+      </li>
+      <li>
+        Workout history, range-of-motion settings, and an optional person outline are stored in
+        this browser’s local storage.
+      </li>
+      <li>JSON and CSV export download a file only when you ask for one.</li>
+    </ul>
+
+    <h2>What “Select person” does</h2>
+    <p>
+      It stores a coarse outline of the head and shoulders from the pose model so that, when more
+      than one person is in frame, the counter can prefer the one you selected. It is not face
+      recognition. There is no identity database. If nobody in frame is close to that outline, the
+      counter follows the largest person instead. Turning your head, or a very different distance
+      from the camera combined with occlusion, can miss the match. Clear the selection at any time.
+    </p>
+
+    <h2>How a set is recorded</h2>
+    <ul>
+      <li>Reps are added only after you start a workout.</li>
+      <li>
+        The rest timer closes a set after that many seconds without a new rep. Time keeps passing
+        if you step out of frame while the camera is still running.
+      </li>
+      <li>
+        Stop video pauses the camera. The open set stays on screen. It is saved when you press
+        Finish, or it closes on its own if you start the camera again after the rest time has
+        already passed.
+      </li>
+      <li>An uploaded clip plays once. Replaying it inside the player would count those reps again.</li>
+    </ul>
+
+    <h2>When the count will be wrong</h2>
+    <ul>
+      <li>The joint angle is measured on the 2D image, so a steep camera angle changes it.</li>
+      <li>A hidden elbow, knee, or hip drops the frame. Loose clothing and poor light do the same.</li>
+      <li>Auto detect is a heuristic. Lock the movement when the guess is unsure.</li>
+      <li>Very fast or partial reps can be missed. Extra movement can be counted.</li>
+      <li>The thresholds are the ones in Range of motion. They are not calibrated to a published test.</li>
+      <li>There is no labelled accuracy study in this project. Do not quote an error rate for it.</li>
+    </ul>
+
+    <p><a href="/">Back to app</a> · <a href="/privacy.html">Privacy</a></p>
+  </body>
+</html>

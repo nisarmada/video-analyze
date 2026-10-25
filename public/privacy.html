@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Privacy — Workout Rep Counter</title>
+    <title>Privacy — RepTrack</title>
     <style>
       body {
         font-family: system-ui, sans-serif;
@@ -17,15 +17,23 @@
   <body>
     <h1>Privacy</h1>
     <p>
-      Workout Rep Counter runs pose estimation in your browser. Camera frames stay on your device
-      unless you choose to export workout history.
+      RepTrack runs pose estimation in your browser. Camera frames and uploaded clips stay on your
+      device. The pose runtime is served with this app, so counting does not send frames to a
+      vision service.
     </p>
     <ul>
-      <li>No account or cloud video storage is required.</li>
-      <li>Workout history and identity profiles are stored in your browser local storage.</li>
-      <li>You can clear history and identity from the app at any time.</li>
-      <li>The pose model is downloaded from Google/CDN on first use.</li>
+      <li>No account is required.</li>
+      <li>
+        Workout history, range-of-motion settings, and an optional person outline are stored in
+        this browser’s local storage.
+      </li>
+      <li>
+        The person outline is a few pose points used to prefer one person in a crowded frame. It
+        is not a face template. You can clear it in the app.
+      </li>
+      <li>You can clear saved workouts from the app. Export downloads a file only if you choose it.</li>
     </ul>
+    <p>See <a href="/limitations.html">limitations</a> for what the counter gets wrong.</p>
     <p><a href="/">Back to app</a></p>
   </body>
 </html>

@@ -7,15 +7,16 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "tsx scripts/smoke-test.ts && tsx scripts/fixture-test.ts",
+    "test": "tsx scripts/smoke-test.ts && tsx scripts/fixture-test.ts && tsx scripts/regression-test.ts",
     "deploy:pages": "npm run build && wrangler deploy"
   },
   "devDependencies": {
-    "typescript": "^5.6.3",
     "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
     "vite": "^5.4.10"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.3.0",
     "@mediapipe/tasks-vision": "^0.10.18"
   }
 }
