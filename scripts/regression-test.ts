@@ -73,6 +73,18 @@ const revived = JSON.parse(JSON.stringify(rest.getLog())) as typeof rest extends
   : { exercise: "pushup"; setNumber: number; reps: number; endedAt: string }[];
 const revivedLine = rest.formatLogEntry(revived[0]);
 assert(revivedLine.includes("Push-up set 1: 5 reps"), `revived log line: ${revivedLine}`);
+const oneRep = new SetTracker(1);
+oneRep.onExerciseChange("pushup");
+oneRep.syncReps("pushup", 1, 0);
+oneRep.tick(1000);
+const oneLine = oneRep.formatLogEntry(oneRep.getLog()[0]);
+assert(oneLine.includes("1 rep") && !oneLine.includes("1 reps"), oneLine);
+const retarget = new SetTracker(1);
+retarget.onExerciseChange("pushup");
+retarget.retargetEmptySet("squat");
+assert(retarget.snapshot().exercise === "squat" && retarget.snapshot().setNumber === 1, "empty retarget");
+retarget.syncReps("squat", 1, 0);
+assert(retarget.snapshot().setNumber === 1 && retarget.snapshot().repsInSet === 1, "retarget keeps set");
 assert(!revivedLine.includes("Invalid Date"), "revived endedAt should format");
 
 const manualClose = new SetTracker(45);

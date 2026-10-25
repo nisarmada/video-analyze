@@ -118,6 +118,7 @@ function applyRomFromInputs(): void {
   repHub.applyRomSettings(normalized);
   saveRomSettings(normalized);
   loadRomIntoUi();
+  elStatus.textContent = "ROM saved";
 }
 
 function loadRomIntoUi(): void {
@@ -435,12 +436,37 @@ inputFile.addEventListener("change", () => {
 });
 
 inputRest.addEventListener("change", () => {
-  setTracker.setRestSeconds(Number(inputRest.value) || 45);
+  const sec = Math.min(180, Math.max(15, Number(inputRest.value) || 45));
+  inputRest.value = String(sec);
+  setTracker.setRestSeconds(sec);
+  elStatus.textContent = `Rest timer ${sec}s`;
 });
 
 selectExerciseMode.addEventListener("change", () => {
   const mode = getExerciseMode();
-  if (mode !== "auto") stabilizer.force(mode);
+  if (mode === "auto") {
+    elStatus.textContent = "Auto detect";
+    return;
+  }
+  const snap = setTracker.snapshot();
+  if (snap.exercise !== "other" && snap.exercise !== mode) {
+    if (snap.repsInSet > 0) {
+      repHub.setActive(mode);
+      setTracker.onExerciseChange(mode);
+      repHub.current().reset();
+      lastRepInSet = 0;
+      renderLog();
+      elReps.textContent = "0";
+      const next = setTracker.snapshot();
+      elSet.textContent = next.setNumber > 0 ? String(next.setNumber) : "0";
+    } else {
+      setTracker.retargetEmptySet(mode);
+    }
+  }
+  stabilizer.force(mode);
+  workExercise = mode;
+  elExercise.textContent = exerciseLabel(mode);
+  elStatus.textContent = `${exerciseLabel(mode)} locked`;
 });
 
 btnStartWorkout.addEventListener("click", () => {
@@ -450,6 +476,18 @@ btnStartWorkout.addEventListener("click", () => {
   btnEndWorkout.disabled = false;
   btnStartWorkout.disabled = true;
   syncWorkoutChrome();
+  const mode = getExerciseMode();
+  elReps.textContent = "0";
+  elSet.textContent = "0";
+  elPhase.textContent = "—";
+  elConfidence.textContent = "—";
+  if (mode === "auto") {
+    elExercise.textContent = "Ready";
+  } else {
+    stabilizer.force(mode);
+    workExercise = mode;
+    elExercise.textContent = exerciseLabel(mode);
+  }
   elStatus.textContent = "Workout started";
 });
 
@@ -492,8 +530,10 @@ btnEnroll.addEventListener("click", () => {
 });
 
 btnClearIdentity.addEventListener("click", () => {
+  const hadProfile = loadIdentity() !== null;
   clearIdentity();
   renderIdentityLabel();
+  elStatus.textContent = hadProfile ? "Person cleared" : "No person was selected";
 });
 
 btnExport.addEventListener("click", () => {
@@ -513,10 +553,19 @@ btnClearHistory.addEventListener("click", () => {
 
 function adjustReps(delta: number): void {
   const ex = activeExerciseForManual();
-  if (ex === "other") return;
+  if (ex === "other") {
+    elStatus.textContent = "Choose a movement first";
+    return;
+  }
   repHub.setActive(ex);
+  const snap = setTracker.snapshot();
+  const current = snap.exercise === ex ? snap.repsInSet : 0;
+  if (delta < 0 && current === 0) {
+    elStatus.textContent = "No reps to remove";
+    return;
+  }
   setTracker.onExerciseChange(ex);
-  const next = Math.max(0, setTracker.snapshot().repsInSet + delta);
+  const next = current + delta;
   setTracker.manualAdjustReps(next);
   repHub.current().reps = next;
   updateUi(ex, 1, next, repHub.current().phase, "Manual adjust");
@@ -527,12 +576,23 @@ btnRepMinus.addEventListener("click", () => adjustReps(-1));
 
 btnNewSet.addEventListener("click", () => {
   const ex = activeExerciseForManual();
-  setTracker.newSet();
-  lastRepInSet = 0;
-  if (ex !== "other") {
-    repHub.setActive(ex);
-    repHub.current().reset();
+  if (ex === "other") {
+    elStatus.textContent = "Choose a movement first";
+    return;
   }
+  repHub.setActive(ex);
+  const before = setTracker.snapshot();
+  if (before.exercise === ex && before.setNumber > 0 && before.repsInSet === 0) {
+    updateUi(ex, 0, 0, "idle", `Set ${before.setNumber} is already empty`);
+    return;
+  }
+  if (before.exercise !== ex || before.setNumber === 0) {
+    setTracker.onExerciseChange(ex);
+  } else {
+    setTracker.newSet();
+  }
+  lastRepInSet = 0;
+  repHub.current().reset();
   renderLog();
   updateUi(ex, 0, 0, "idle", "New set");
 });

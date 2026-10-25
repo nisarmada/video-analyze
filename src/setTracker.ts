@@ -60,6 +60,14 @@ export class SetTracker {
     }
   }
 
+  /** Keep the same set number when an empty set is pointed at another movement. */
+  retargetEmptySet(next: ExerciseId): void {
+    if (next === "other" || next === this.exercise) return;
+    if (this.setNumber === 0 || this.repsInSet > 0) return;
+    this.exercise = next;
+    this.lastRepAt = null;
+  }
+
   syncReps(exercise: ExerciseId, reps: number, nowMs: number): void {
     if (exercise === "other") return;
     if (exercise !== this.exercise) this.onExerciseChange(exercise);
@@ -126,6 +134,7 @@ export class SetTracker {
 
   formatLogEntry(r: SetRecord): string {
     const t = new Date(r.endedAt).toLocaleTimeString();
-    return `${t} — ${exerciseLabel(r.exercise)} set ${r.setNumber}: ${r.reps} reps`;
+    const reps = r.reps === 1 ? "1 rep" : `${r.reps} reps`;
+    return `${t} — ${exerciseLabel(r.exercise)} set ${r.setNumber}: ${reps}`;
   }
 }
