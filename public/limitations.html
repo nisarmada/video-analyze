@@ -60,7 +60,10 @@
 
     <h2>When the count will be wrong</h2>
     <ul>
-      <li>The joint angle is measured on the 2D image, so a steep camera angle changes it.</li>
+      <li>
+        Elbow, knee, and torso angles come from the 3D pose. A steep camera changes them less than a
+        flat image angle would, and it does not remove errors from a hidden joint.
+      </li>
       <li>A hidden elbow, knee, or hip drops the frame. Loose clothing and poor light do the same.</li>
       <li>Auto detect is a heuristic. Lock the movement when the guess is unsure.</li>
       <li>Very fast or partial reps can be missed. Extra movement can be counted.</li>
