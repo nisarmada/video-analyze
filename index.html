@@ -45,6 +45,11 @@
           </div>
         </div>
 
+        <div class="pose3d-panel">
+          <p class="pose3d-label">3D pose</p>
+          <canvas id="pose-3d" aria-label="3D pose"></canvas>
+        </div>
+
         <div class="primary-actions">
           <button type="button" class="btn btn-primary" id="btn-start-workout">Start workout</button>
           <button type="button" class="btn btn-danger" id="btn-end-workout" disabled>Finish</button>
@@ -123,7 +128,7 @@
           <fieldset>
             <legend>Push-up / pull-up</legend>
             <label>Top <input type="number" id="rom-push-top" min="120" max="180" value="155" /></label>
-            <label>Bottom <input type="number" id="rom-push-bottom" min="60" max="140" value="105" /></label>
+            <label>Bottom <input type="number" id="rom-push-bottom" min="60" max="140" value="115" /></label>
           </fieldset>
           <fieldset>
             <legend>Squat</legend>

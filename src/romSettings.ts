@@ -8,8 +8,8 @@ export type RomThresholds = {
 export type RomSettings = Record<ExerciseId, RomThresholds>;
 
 export const DEFAULT_ROM: RomSettings = {
-  pushup: { topMin: 155, bottomMax: 105 },
-  pullup: { topMin: 155, bottomMax: 105 },
+  pushup: { topMin: 155, bottomMax: 115 },
+  pullup: { topMin: 155, bottomMax: 115 },
   squat: { topMin: 155, bottomMax: 115 },
   other: { topMin: 155, bottomMax: 105 },
 };

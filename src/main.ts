@@ -22,6 +22,7 @@ import {
   drawPose,
   initPoseLandmarker,
 } from "./poseDetector";
+import { drawWorldPose } from "./pose3d";
 import { onRepRegistered } from "./repFeedback";
 import { RepCounterHub } from "./repCounter";
 import {
@@ -43,8 +44,10 @@ import { formatWorkoutSummary, historyToCsv } from "./workoutSummary";
 
 const video = document.getElementById("video") as HTMLVideoElement;
 const overlay = document.getElementById("overlay") as HTMLCanvasElement;
+const pose3d = document.getElementById("pose-3d") as HTMLCanvasElement;
 const videoWrap = document.getElementById("video-wrap") as HTMLElement;
 const ctx = overlay.getContext("2d")!;
+const pose3dCtx = pose3d.getContext("2d")!;
 
 const elExercise = document.getElementById("stat-exercise")!;
 const elConfidence = document.getElementById("stat-confidence")!;
@@ -92,6 +95,7 @@ let detector: Awaited<ReturnType<typeof initPoseLandmarker>> | null = null;
 let raf = 0;
 let stream: MediaStream | null = null;
 let fileUrl: string | null = null;
+let modelClock = 0;
 let lastTimestamp = -1;
 let workExercise: ReturnType<ExerciseStabilizer["getActive"]> = "other";
 let lastRepInSet = 0;
@@ -166,6 +170,8 @@ renderHistory();
 function resizeCanvas(): void {
   overlay.width = video.clientWidth;
   overlay.height = video.clientHeight;
+  pose3d.width = pose3d.clientWidth;
+  pose3d.height = pose3d.clientHeight;
 }
 
 function renderLog(): void {
@@ -289,6 +295,7 @@ function stopPlayback(): void {
   btnStop.disabled = true;
   if (detector) btnWebcam.disabled = false;
   ctx.clearRect(0, 0, overlay.width, overlay.height);
+  pose3dCtx.clearRect(0, 0, pose3d.width, pose3d.height);
   elCameraHint.textContent = "Start camera to see framing tips";
 }
 
@@ -314,10 +321,19 @@ async function loop(): Promise<void> {
   }
   lastTimestamp = timestampMs;
 
-  const result = detectForVideo(detector, video, timestampMs);
+  const result = (() => {
+    try {
+      modelClock += 33;
+      return detectForVideo(detector, video, modelClock);
+    } catch (err) {
+      console.error(err);
+      return null;
+    }
+  })();
   ctx.clearRect(0, 0, overlay.width, overlay.height);
 
   if (!result?.landmarks?.length) {
+    pose3dCtx.clearRect(0, 0, pose3d.width, pose3d.height);
     elCameraHint.textContent = cameraGuidance(undefined);
     noteRest();
     raf = requestAnimationFrame(loop);
@@ -326,6 +342,7 @@ async function loop(): Promise<void> {
 
   const poseIndex = pickPoseIndex(result.landmarks, loadIdentity());
   const landmarks = result.landmarks[poseIndex];
+  const world = result.worldLandmarks?.[poseIndex];
   latestLandmarks = landmarks;
   elCameraHint.textContent = cameraGuidance(landmarks);
   const content = objectFitContainRect(
@@ -335,8 +352,9 @@ async function loop(): Promise<void> {
     video.videoHeight,
   );
   drawPose(ctx, landmarks, overlay.width, overlay.height, content);
+  drawWorldPose(pose3dCtx, world, pose3d.width, pose3d.height);
 
-  const features = extractPoseFeatures(landmarks);
+  const features = extractPoseFeatures(landmarks, world);
   if (features) {
     const guess = classifyExercise(features);
     const mode = getExerciseMode();

@@ -54,7 +54,30 @@ export function detectForVideo(
   timestampMs: number,
 ): PoseLandmarkerResult | null {
   if (video.readyState < 2) return null;
-  return detector.detectForVideo(video, timestampMs);
+  return detector.detectForVideo(sourceForDetection(video), timestampMs);
+}
+
+const MAX_DETECT_WIDTH = 640;
+let detectCanvas: HTMLCanvasElement | null = null;
+let detectCtx: CanvasRenderingContext2D | null = null;
+
+/** The model does not need a 4K frame. Normalized and world landmarks stay metric. */
+function sourceForDetection(video: HTMLVideoElement): HTMLVideoElement | HTMLCanvasElement {
+  const srcW = video.videoWidth;
+  const srcH = video.videoHeight;
+  if (!srcW || !srcH || srcW <= MAX_DETECT_WIDTH) return video;
+  if (!detectCanvas) {
+    detectCanvas = document.createElement("canvas");
+    detectCtx = detectCanvas.getContext("2d", { alpha: false });
+  }
+  const width = MAX_DETECT_WIDTH;
+  const height = Math.max(1, Math.round((srcH * width) / srcW));
+  if (detectCanvas.width !== width || detectCanvas.height !== height) {
+    detectCanvas.width = width;
+    detectCanvas.height = height;
+  }
+  detectCtx?.drawImage(video, 0, 0, width, height);
+  return detectCanvas;
 }
 
 /** Draw pose connections (subset) for feedback. */

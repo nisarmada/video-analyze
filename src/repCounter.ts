@@ -14,7 +14,7 @@ export type RepCounterState = {
 type FsmState = "start" | "down" | "up";
 
 const MIN_REP_MS = 450;
-const DEBOUNCE_FRAMES = 4;
+const DEBOUNCE_FRAMES = 3;
 
 abstract class BaseRepCounter {
   protected fsm: FsmState = "start";
