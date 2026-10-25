@@ -8,8 +8,9 @@ import {
   signatureDistance,
   type IdentityProfile,
 } from "../src/identity";
-import type { Landmark } from "../src/landmarks";
-import { angleAtJoint } from "../src/math";
+import { extractPoseFeatures, Pose, type Landmark } from "../src/landmarks";
+import { angleAtJoint, angleAtJoint3, torsoFromVertical3 } from "../src/math";
+import { projectWorldPoint, layoutWorldPose } from "../src/pose3d";
 import { RepCounterHub } from "../src/repCounter";
 import { SetTracker } from "../src/setTracker";
 import { mapLandmarkToCanvas, objectFitContainRect } from "../src/videoLayout";
@@ -28,6 +29,125 @@ assert(
   Number.isNaN(angleAtJoint({ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 1, y: 0 })),
   "degenerate angle should be NaN",
 );
+
+const right3 = angleAtJoint3({ x: 1, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }, { x: 0, y: 1, z: 0 });
+assert(Math.abs(right3 - 90) < 1e-6, `3D right angle ${right3}`);
+const depthOnly = angleAtJoint3(
+  { x: 0, y: 1, z: 0 },
+  { x: 0, y: 0, z: 0 },
+  { x: 0, y: 0, z: 1 },
+);
+assert(Math.abs(depthOnly - 90) < 1e-6, `depth-only bend ${depthOnly}`);
+const flatOfDepth = angleAtJoint({ x: 0, y: 1 }, { x: 0, y: 0 }, { x: 0, y: 0 });
+assert(Number.isNaN(flatOfDepth), "the same bend is invisible on the image");
+assert(
+  Number.isNaN(angleAtJoint3({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 })),
+  "degenerate 3D angle should be NaN",
+);
+const upright = torsoFromVertical3({ x: 0, y: -0.5, z: 0.2 }, { x: 0, y: 0, z: 0 });
+assert(upright < 25, `upright torso ${upright}`);
+const plank = torsoFromVertical3({ x: 0.5, y: 0, z: 0.1 }, { x: 0, y: 0, z: 0 });
+assert(plank > 70, `plank torso ${plank}`);
+
+function blankPose(): Landmark[] {
+  const pts: Landmark[] = [];
+  const mark = (i: number, x: number, y: number) => {
+    pts[i] = { x, y, visibility: 1 };
+  };
+  mark(Pose.L_SHOULDER, 0.15, 0.35);
+  mark(Pose.R_SHOULDER, 0.25, 0.35);
+  mark(Pose.L_ELBOW, 0.15, 0.5);
+  mark(Pose.R_ELBOW, 0.25, 0.5);
+  mark(Pose.L_WRIST, 0.3, 0.5);
+  mark(Pose.R_WRIST, 0.4, 0.5);
+  mark(Pose.L_HIP, 0.75, 0.35);
+  mark(Pose.R_HIP, 0.85, 0.35);
+  mark(Pose.L_KNEE, 0.75, 0.55);
+  mark(Pose.R_KNEE, 0.85, 0.55);
+  mark(Pose.L_ANKLE, 0.9, 0.55);
+  mark(Pose.R_ANKLE, 1, 0.55);
+  return pts;
+}
+
+const imageBent = extractPoseFeatures(blankPose());
+assert(imageBent !== null && imageBent.elbowAngle < 120, `image elbow ${imageBent?.elbowAngle}`);
+assert(imageBent !== null && imageBent.torsoFromVerticalDeg > 70, "image torso looks horizontal");
+
+const world = blankPose().map(() => ({ x: 0, y: 0, z: 0, visibility: 1 }));
+const put = (i: number, x: number, y: number, z: number) => {
+  world[i] = { x, y, z, visibility: 1 };
+};
+put(Pose.L_SHOULDER, -0.2, -0.5, 0);
+put(Pose.R_SHOULDER, 0.2, -0.5, 0);
+put(Pose.L_ELBOW, -0.2, -0.2, 0);
+put(Pose.R_ELBOW, 0.2, -0.2, 0);
+put(Pose.L_WRIST, -0.2, 0.1, 0);
+put(Pose.R_WRIST, 0.2, 0.1, 0);
+put(Pose.L_HIP, -0.15, 0, 0);
+put(Pose.R_HIP, 0.15, 0, 0);
+put(Pose.L_KNEE, -0.15, 0.4, 0);
+put(Pose.R_KNEE, 0.15, 0.4, 0);
+put(Pose.L_ANKLE, -0.15, 0.8, 0);
+put(Pose.R_ANKLE, 0.15, 0.8, 0);
+const metric = extractPoseFeatures(blankPose(), world);
+assert(metric !== null && metric.elbowAngle > 170, `3D elbow should be straight, ${metric?.elbowAngle}`);
+assert(metric !== null && metric.torsoFromVerticalDeg < 15, `3D torso should be upright, ${metric?.torsoFromVerticalDeg}`);
+assert(metric !== null && Math.abs(metric.shoulderSpan - 0.1) < 1e-6, "view width stays on the image");
+
+const sideImage = blankPose();
+sideImage[Pose.L_SHOULDER].visibility = 0.95;
+sideImage[Pose.L_ELBOW].visibility = 0.95;
+sideImage[Pose.L_WRIST].visibility = 0.95;
+sideImage[Pose.R_SHOULDER].visibility = 0.95;
+sideImage[Pose.R_ELBOW].visibility = 0.4;
+sideImage[Pose.R_WRIST].visibility = 0.4;
+const sideWorld = world.map((p) => ({ ...p }));
+sideWorld[Pose.L_WRIST] = { x: 0.1, y: -0.2, z: 0, visibility: 1 };
+const side = extractPoseFeatures(sideImage, sideWorld);
+assert(side !== null && side.elbowAngle < 110, `clearer arm should win, elbow ${side?.elbowAngle}`);
+
+const evenImage = blankPose();
+for (const index of [Pose.L_SHOULDER, Pose.L_ELBOW, Pose.L_WRIST, Pose.R_SHOULDER, Pose.R_ELBOW, Pose.R_WRIST]) {
+  evenImage[index].visibility = 0.9;
+}
+const evenWorld = sideWorld.map((p) => ({ ...p }));
+evenWorld[Pose.R_SHOULDER] = { x: 0.2, y: -0.5, z: 0, visibility: 1 };
+evenWorld[Pose.R_ELBOW] = { x: 0.2, y: -0.2, z: 0, visibility: 1 };
+evenWorld[Pose.R_WRIST] = { x: 0.2, y: 0.1, z: 0, visibility: 1 };
+const even = extractPoseFeatures(evenImage, evenWorld);
+assert(even !== null && even.elbowAngle < 110, `bent arm should win a disagreement, elbow ${even?.elbowAngle}`);
+
+const laid = layoutWorldPose(
+  [
+    undefined,
+    ...Array(10),
+    { x: -0.8, y: 0, z: 0, visibility: 1 },
+    { x: 0.8, y: 0, z: 0.4, visibility: 0.1 },
+    undefined,
+    undefined,
+    { x: 0.8, y: -0.2, z: 0, visibility: 1 },
+  ],
+  200,
+  120,
+);
+const leftJoint = laid[11];
+const hidden = laid[12];
+const rightJoint = laid[15];
+assert(hidden === null, "a hidden joint is not drawn");
+assert(leftJoint !== null && rightJoint !== null, "visible joints are placed");
+if (leftJoint && rightJoint) {
+  assert(rightJoint.x > leftJoint.x, "the body keeps its left-right order");
+  assert(leftJoint.x > 8 && rightJoint.x < 192, "the pose is fitted inside the panel");
+  assert(leftJoint.y > 8 && leftJoint.y < 112 && rightJoint.y > 8 && rightJoint.y < 112, "vertical fit");
+}
+
+const hip = projectWorldPoint({ x: 0, y: 0, z: 0 }, 200, 100);
+assert(Math.abs(hip.x - 100) < 1e-6, `3D origin x ${hip.x}`);
+const below = projectWorldPoint({ x: 0, y: 1, z: 0 }, 200, 100);
+assert(below.y > hip.y, "downward world y draws lower on the panel");
+const rightSide = projectWorldPoint({ x: 1, y: 0, z: 0 }, 200, 100);
+const closer = projectWorldPoint({ x: 0, y: 0, z: 1 }, 200, 100);
+assert(Math.abs(rightSide.x - closer.x) > 5, "depth and width land in different places");
 
 const wideInTall = objectFitContainRect(300, 400, 1920, 1080);
 assert(Math.abs(wideInTall.x) < 1e-6, `wide video x ${wideInTall.x}`);
