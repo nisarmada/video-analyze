@@ -31,7 +31,14 @@ export type PoseFeatures = {
   elbowAngle: number;
   kneeAngle: number;
   torsoFromVerticalDeg: number;
+  /** Max of left/right wrist elevation above shoulder line (y-down coords). */
   wristAboveShoulder: number;
+  /** Normalized horizontal distance between shoulders; small in side/profile view. */
+  shoulderSpan: number;
+  /** Distance between ankles when both visible; wide during standing squats. */
+  ankleSpan: number;
+  /** Max elbow elevation relative to shoulder line (profile hang). */
+  elbowAboveShoulder: number;
   visibilityOk: boolean;
 };
 
@@ -85,11 +92,20 @@ export function extractPoseFeatures(landmarks: Landmark[]): PoseFeatures | null 
   const torsoFromVerticalDeg =
     (Math.atan2(Math.abs(dx), Math.abs(dy) + 1e-6) * 180) / Math.PI;
 
-  let wristAboveShoulder = 0;
-  if (lw && rw) {
-    const wristY = (lw.y + rw.y) / 2;
-    wristAboveShoulder = shoulder.y - wristY;
-  }
+  const wristElevations: number[] = [];
+  if (lw) wristElevations.push(shoulder.y - lw.y);
+  if (rw) wristElevations.push(shoulder.y - rw.y);
+  const wristAboveShoulder =
+    wristElevations.length > 0 ? Math.max(...wristElevations) : 0;
+
+  const shoulderSpan = Math.abs(ls.x - rs.x);
+  const ankleSpan = la && ra ? Math.abs(la.x - ra.x) : NaN;
+
+  const elbowElevations: number[] = [];
+  if (le) elbowElevations.push(shoulder.y - le.y);
+  if (re) elbowElevations.push(shoulder.y - re.y);
+  const elbowAboveShoulder =
+    elbowElevations.length > 0 ? Math.max(...elbowElevations) : 0;
 
   const visibilityOk = elbowAngles.length > 0 && (kneeAngles.length > 0 || torsoFromVerticalDeg > 25);
 
@@ -98,6 +114,9 @@ export function extractPoseFeatures(landmarks: Landmark[]): PoseFeatures | null 
     kneeAngle,
     torsoFromVerticalDeg,
     wristAboveShoulder,
+    shoulderSpan,
+    ankleSpan,
+    elbowAboveShoulder,
     visibilityOk,
   };
 }

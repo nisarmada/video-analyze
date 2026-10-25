@@ -11,6 +11,9 @@ const base: PoseFeatures = {
   kneeAngle: 170,
   torsoFromVerticalDeg: 70,
   wristAboveShoulder: 0,
+  shoulderSpan: 0.22,
+  ankleSpan: 0.14,
+  elbowAboveShoulder: -0.08,
   visibilityOk: true,
 };
 
@@ -72,8 +75,85 @@ const squatGuess = classifyExercise({
   torsoFromVerticalDeg: 15,
   kneeAngle: 100,
   wristAboveShoulder: -0.02,
+  shoulderSpan: 0.2,
 });
 assert(squatGuess.id === "squat", `classify squat got ${squatGuess.id}`);
+
+const pullFront = classifyExercise({
+  ...base,
+  torsoFromVerticalDeg: 12,
+  elbowAngle: 95,
+  wristAboveShoulder: 0.06,
+  shoulderSpan: 0.2,
+  kneeAngle: 165,
+});
+assert(pullFront.id === "pullup", `classify front pull-up got ${pullFront.id}`);
+
+const pullSide = classifyExercise({
+  ...base,
+  torsoFromVerticalDeg: 18,
+  elbowAngle: 100,
+  wristAboveShoulder: 0.04,
+  shoulderSpan: 0.08,
+  ankleSpan: 0.05,
+  elbowAboveShoulder: 0.05,
+  kneeAngle: 168,
+});
+assert(pullSide.id === "pullup", `classify side pull-up got ${pullSide.id}`);
+
+const sideSquatTop = classifyExercise({
+  ...base,
+  torsoFromVerticalDeg: 15,
+  elbowAngle: 165,
+  wristAboveShoulder: -0.08,
+  shoulderSpan: 0.09,
+  ankleSpan: 0.16,
+  elbowAboveShoulder: -0.1,
+  kneeAngle: 172,
+});
+assert(sideSquatTop.id === "squat", `classify side squat top got ${sideSquatTop.id}`);
+
+const sideSquatFeetTogether = classifyExercise({
+  ...base,
+  torsoFromVerticalDeg: 14,
+  elbowAngle: 168,
+  wristAboveShoulder: -0.07,
+  shoulderSpan: 0.09,
+  ankleSpan: 0.05,
+  elbowAboveShoulder: -0.09,
+  kneeAngle: 170,
+});
+assert(
+  sideSquatFeetTogether.id !== "pullup",
+  `side squat feet together should not be pull-up, got ${sideSquatFeetTogether.id}`,
+);
+
+const gobletSquatProfile = classifyExercise({
+  ...base,
+  torsoFromVerticalDeg: 12,
+  elbowAngle: 85,
+  wristAboveShoulder: -0.06,
+  elbowAboveShoulder: -0.04,
+  shoulderSpan: 0.1,
+  ankleSpan: 0.06,
+  kneeAngle: 165,
+});
+assert(
+  gobletSquatProfile.id !== "pullup",
+  `goblet squat profile should not be pull-up, got ${gobletSquatProfile.id}`,
+);
+
+const profileRest = classifyExercise({
+  ...base,
+  torsoFromVerticalDeg: 10,
+  elbowAngle: 165,
+  wristAboveShoulder: 0,
+  elbowAboveShoulder: 0,
+  shoulderSpan: 0.09,
+  ankleSpan: 0.06,
+  kneeAngle: 175,
+});
+assert(profileRest.id !== "pullup", `profile rest should not be pull-up, got ${profileRest.id}`);
 
 const manual = resolveActiveExercise("pushup", {
   id: "other",

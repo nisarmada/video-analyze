@@ -18,6 +18,9 @@ const base: PoseFeatures = {
   kneeAngle: 170,
   torsoFromVerticalDeg: 70,
   wristAboveShoulder: 0,
+  shoulderSpan: 0.22,
+  ankleSpan: 0.14,
+  elbowAboveShoulder: -0.08,
   visibilityOk: true,
 };
 

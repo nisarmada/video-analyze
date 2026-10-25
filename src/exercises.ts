@@ -35,19 +35,46 @@ export function classifyExercise(f: PoseFeatures): ExerciseGuess {
     if (f.elbowAngle < 130) scores.pushup += 0.2;
   }
 
+  const profileView = f.shoulderSpan < 0.14;
+  const legsHanging =
+    !Number.isFinite(f.kneeAngle) || f.kneeAngle > 135;
+  const feetWide =
+    Number.isFinite(f.ankleSpan) && f.ankleSpan > 0.11;
+  const armsElevatedForHang =
+    f.wristAboveShoulder >= 0.03 || f.elbowAboveShoulder >= 0.03;
+  const squatting =
+    Number.isFinite(f.kneeAngle) && f.kneeAngle < 140;
+  const pullUpProfile =
+    vertical &&
+    profileView &&
+    legsHanging &&
+    !horizontal &&
+    !feetWide &&
+    !squatting &&
+    armsElevatedForHang;
+  const pullUpFront = vertical && f.wristAboveShoulder > 0.02;
+
   if (vertical && Number.isFinite(f.kneeAngle)) {
-    scores.squat += 0.45;
-    if (f.kneeAngle < 130) scores.squat += 0.25;
-    if (f.wristAboveShoulder < 0.05) scores.squat += 0.1;
+    if (feetWide || f.kneeAngle < 150) {
+      scores.squat += 0.45;
+      if (f.kneeAngle < 130) scores.squat += 0.25;
+      if (f.wristAboveShoulder < 0.05) scores.squat += 0.1;
+    } else if (!pullUpProfile) {
+      scores.squat += 0.35;
+    }
   }
 
-  if (vertical && f.wristAboveShoulder > 0.02) {
-    scores.pullup += 0.5;
-    if (f.elbowAngle < 120) scores.pullup += 0.2;
+  if (pullUpFront || pullUpProfile) {
+    scores.pullup += 0.52;
+    if (f.elbowAngle < 120) scores.pullup += 0.22;
   }
 
-  if (f.wristAboveShoulder > 0.08 && f.elbowAngle > 150) {
+  if (pullUpFront && f.wristAboveShoulder > 0.08 && f.elbowAngle > 150) {
     scores.pullup += 0.15;
+  }
+
+  if (pullUpProfile && f.elbowAngle > 145) {
+    scores.pullup += 0.12;
   }
 
   let best: ExerciseId = "other";
